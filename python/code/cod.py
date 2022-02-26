@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
+KEYPOINTS_JSON = '_keypoints.json'
+
 
 def main():
     path = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
@@ -96,8 +98,7 @@ def plot_y_features(df):
     X = pd.Series(range(df.shape[0]))
     for feature in df.columns:
         if '_y' in feature:
-            fig.add_trace(go.Scatter(x=X, y=df[feature], name=feature),
-                          row=r, col=c)
+            fig.add_trace(go.Scatter(x=X, y=df[feature], name=feature), row=r, col=c)
             fig.update_xaxes(title_text=feature, row=r, col=c)
             if c < 6:
                 c = c + 1
@@ -108,32 +109,34 @@ def plot_y_features(df):
     fig.show()
 
 
-def read_pose_values(path, file_name):
-    # try:
-    path, dirs, files = next(os.walk(path))
-    df_output = pd.DataFrame()
-    for i in range(len(files)):
-        if i <= 9:
-            fpath = path + '\\' + file_name + '_00000000000' + str(i) + '_keypoints.json'
-            pose_sample = read_json(fpath)
-        elif i <= 99:
-            fpath = path + '\\' + file_name + '_0000000000' + str(i) + '_keypoints.json'
-            pose_sample = read_json(fpath)
-        else:
-            fpath = path + '\\' + file_name + '_000000000' + str(i) + '_keypoints.json'
-            pose_sample = read_json(fpath)
+def create_pose_dataframe(folder_path, file_name):
+    try:
+        _, _, files = next(os.walk(folder_path))
+        dataframe = pd.DataFrame()
+        for i in range(len(files)):
+            if i <= 9:
+                file_path = folder_path + '\\' + file_name + '_00000000000' + str(i) + KEYPOINTS_JSON
+                json_data = read_json_file(file_path)
+            elif i <= 99:
+                file_path = folder_path + '\\' + file_name + '_0000000000' + str(i) + KEYPOINTS_JSON
+                json_data = read_json_file(file_path)
+            elif i <= 999:
+                file_path = folder_path + '\\' + file_name + '_000000000' + str(i) + KEYPOINTS_JSON
+                json_data = read_json_file(file_path)
+            else:
+                file_path = folder_path + '\\' + file_name + '_00000000' + str(i) + KEYPOINTS_JSON
+                json_data = read_json_file(file_path)
 
-        df_output = df_output.append(pose_sample, ignore_index=True)
-    return df_output
+            dataframe = dataframe.append(json_data, ignore_index=True)
+        return dataframe
+    except Exception as ex:
+        print(ex)
 
 
-# except Exception as e:
-#     print(e)
-
-def read_json(path):
-    with open(path) as json_data:
-        data = json.load(json_data)
-    return data["people"][0]
+def read_json_file(file_path):
+    with open(file_path) as json_file:
+        json_data = json.load(json_file)
+    return json_data["people"][0]
 
 
 '''
@@ -162,17 +165,20 @@ def transform_and_transpose(pose_data, label):
                       'right_ankle_x', 'right_ankle_y', 'left_hip_x', 'left_hip_y', 'left_knee_x', 'left_knee_y',
                       'left_ankle_x', 'left_ankle_y', 'right_eye_x', 'right_eye_y', 'left_eye_x', 'left_eye_y',
                       'right_ear_x', 'right_ear_y', 'left_ear_x', 'left_ear_y', 'background_x', 'background_y']
+
+    # TODO: make list with useless columns to drop. example: for pushups: wrist, ankle
+
     # interpolate 0 values
-    # output.replace(0, np.nan, inplace=True)
+    output.replace(0, np.nan, inplace=True)
     output.interpolate(method='linear', limit_direction='forward', inplace=True)
 
     return output
 
 
-def model_exercise(json, file_name, label):
-    df_raw = read_pose_values(json, file_name)
+def model_exercise(folder_path, file_name, label):
+    df_raw = create_pose_dataframe(folder_path, file_name)
     df_modeled = transform_and_transpose(df_raw, label)
-    df_modeled.to_pickle(label + ".pkl")
+    # df_modeled.to_pickle(label + ".pkl")
     # print(df_modeled)
     return df_modeled
 
