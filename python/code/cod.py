@@ -162,9 +162,7 @@ def transform_and_transpose(raw_pd_pose_model):
             modeled_pd_pose_model = modeled_pd_pose_model.append(
                 pd.DataFrame(raw_pd_pose_model["pose_keypoints_2d"][i]).T)
 
-    # drop confidence detection
-    for i in range(2, modeled_pd_pose_model.shape[1], 3):
-        modeled_pd_pose_model.drop(columns=[i], inplace=True)
+    drop_confidence_columns(modeled_pd_pose_model)
 
     # rename columns
     modeled_pd_pose_model.columns = model_columns
@@ -182,6 +180,12 @@ def drop_specific_columns(modeled_pd_pose_model):
         for column in modeled_pd_pose_model.columns:
             if column_to_drop in column:
                 modeled_pd_pose_model.drop(columns=[column], inplace=True)
+
+
+def drop_confidence_columns(modeled_pd_pose_model):
+    model_columns_count = modeled_pd_pose_model.shape[1]
+    for i in range(2, model_columns_count, 3):
+        modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
 
 def model_prepare(folder_path, file_name, label, save_model):
