@@ -12,6 +12,15 @@ import plotly.express as px
 
 KEYPOINTS_JSON = '_keypoints.json'
 
+pushups_columns_to_drop = ['wrist', 'ankle']
+
+model_columns = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y', 'right_elbow_x', 'right_elbow_y',
+                 'right_wrist_x', 'right_wrist_y', 'left_shoulder_x', 'left_shoulder_y', 'left_elbow_x', 'left_elbow_y',
+                 'left_wrist_x', 'left_wrist_y', 'right_hip_x', 'right_hip_y', 'right_knee_x', 'right_knee_y',
+                 'right_ankle_x', 'right_ankle_y', 'left_hip_x', 'left_hip_y', 'left_knee_x', 'left_knee_y',
+                 'left_ankle_x', 'left_ankle_y', 'right_eye_x', 'right_eye_y', 'left_eye_x', 'left_eye_y',
+                 'right_ear_x', 'right_ear_y', 'left_ear_x', 'left_ear_y', 'background_x', 'background_y']
+
 
 def main():
     path = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
@@ -20,11 +29,11 @@ def main():
     pullups_good_label = "pullups_good"
     pullups_bad_label = "pullups_bad"
 
-    pushups_good = model_exercise(path + r'\goodpushups', 'good_pushups_example', pushups_good_label)
-    pushups_bad = model_exercise(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label)
+    pushups_good = model_prepare(path + r'\goodpushups', 'good_pushups_example', pushups_good_label, False)
+    pushups_bad = model_prepare(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label, False)
 
-    pullups_good = model_exercise(path + r'\goodpullups', 'good_pullups_example', pullups_good_label)
-    pullups_bad = model_exercise(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label)
+    pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False)
+    pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False)
 
     # plot_y_features(df_exercise_good)
     # plot_y_features(df_exercise_bad)
@@ -42,13 +51,10 @@ def main():
         print("exercise is good")
     elif median_value < 25:
         print("exercise is ok")
-    elif median_value < 50:
+    elif median_value < 35:
         print("exercise is incomplete")
     else:
         print("wrong exercise")
-
-    evaluated.plot()
-    # plt.show()
 
 
 def evaluate_dtw(df1, df2, feature):
@@ -148,39 +154,51 @@ Left Ear – 17, Background – 18
 '''
 
 
-def transform_and_transpose(pose_data, label):
-    output = pd.DataFrame()
-    for i in range(pose_data.shape[0] - 1):
-        if len(pose_data["pose_keypoints_2d"]) > 0:
-            output = output.append(pd.DataFrame(pose_data["pose_keypoints_2d"][i]).T)
+def transform_and_transpose(raw_pd_pose_model):
+    modeled_pd_pose_model = pd.DataFrame()
+    model_rows_count = raw_pd_pose_model.shape[0]
+    for i in range(model_rows_count - 1):
+        if len(raw_pd_pose_model["pose_keypoints_2d"]) > 0:
+            modeled_pd_pose_model = modeled_pd_pose_model.append(
+                pd.DataFrame(raw_pd_pose_model["pose_keypoints_2d"][i]).T)
+
     # drop confidence detection
-    for y in range(2, output.shape[1], 3):
-        output.drop(columns=[y], inplace=True)
+    for i in range(2, modeled_pd_pose_model.shape[1], 3):
+        modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
     # rename columns
-    output.columns = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y', 'right_elbow_x', 'right_elbow_y',
-                      'right_wrist_x', 'right_wrist_y', 'left_shoulder_x', 'left_shoulder_y', 'left_elbow_x',
-                      'left_elbow_y', 'left_wrist_x', 'left_wrist_y', 'right_hip_x', 'right_hip_y', 'right_knee_x',
-                      'right_knee_y',
-                      'right_ankle_x', 'right_ankle_y', 'left_hip_x', 'left_hip_y', 'left_knee_x', 'left_knee_y',
-                      'left_ankle_x', 'left_ankle_y', 'right_eye_x', 'right_eye_y', 'left_eye_x', 'left_eye_y',
-                      'right_ear_x', 'right_ear_y', 'left_ear_x', 'left_ear_y', 'background_x', 'background_y']
-
-    # TODO: make list with useless columns to drop. example: for pushups: wrist, ankle
+    modeled_pd_pose_model.columns = model_columns
+    drop_specific_columns(modeled_pd_pose_model)
 
     # interpolate 0 values
-    output.replace(0, np.nan, inplace=True)
-    output.interpolate(method='linear', limit_direction='forward', inplace=True)
+    # output.replace(0, np.nan, inplace=True)
+    modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
-    return output
+    return modeled_pd_pose_model
 
 
-def model_exercise(folder_path, file_name, label):
-    df_raw = create_pose_dataframe(folder_path, file_name)
-    df_modeled = transform_and_transpose(df_raw, label)
-    # df_modeled.to_pickle(label + ".pkl")
-    # print(df_modeled)
-    return df_modeled
+def drop_specific_columns(modeled_pd_pose_model):
+    for column_to_drop in pushups_columns_to_drop:
+        for column in modeled_pd_pose_model.columns:
+            if column_to_drop in column:
+                modeled_pd_pose_model.drop(columns=[column], inplace=True)
+
+
+def model_prepare(folder_path, file_name, label, save_model):
+    raw_pd_pose_model = create_pose_dataframe(folder_path, file_name)
+    modeled_pd_pose_model = transform_and_transpose(raw_pd_pose_model)
+    if save_model:
+        save_to_pickle(modeled_pd_pose_model, label)
+    return modeled_pd_pose_model
+
+
+def save_to_pickle(modeled_pd_pose_model, label):
+    modeled_pd_pose_model.to_pickle(label + ".pkl")
+    print("model ", label, " saved to ", label + ".pkl")
+
+
+def load_from_pickle(label):
+    return pd.read_pickle(label + ".pkl")
 
 
 if __name__ == '__main__':
