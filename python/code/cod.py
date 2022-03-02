@@ -14,6 +14,13 @@ KEYPOINTS_JSON = '_keypoints.json'
 
 pushups_columns_to_drop = ['wrist', 'ankle']
 
+'''
+Nose – 0, Neck – 1, Right Shoulder – 2, Right Elbow – 3, Right Wrist – 4,
+Left Shoulder – 5, Left Elbow – 6, Left Wrist – 7, Right Hip – 8,
+Right Knee – 9, Right Ankle – 10, Left Hip – 11, Left Knee – 12,
+LAnkle – 13, Right Eye – 14, Left Eye – 15, Right Ear – 16,
+Left Ear – 17, Background – 18
+'''
 model_columns = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y', 'right_elbow_x', 'right_elbow_y',
                  'right_wrist_x', 'right_wrist_y', 'left_shoulder_x', 'left_shoulder_y', 'left_elbow_x', 'left_elbow_y',
                  'left_wrist_x', 'left_wrist_y', 'right_hip_x', 'right_hip_y', 'right_knee_x', 'right_knee_y',
@@ -32,8 +39,8 @@ def main():
     pushups_good = model_prepare(path + r'\goodpushups', 'good_pushups_example', pushups_good_label, False)
     pushups_bad = model_prepare(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label, False)
 
-    pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False)
-    pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False)
+    # pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False)
+    # pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False)
 
     # plot_y_features(df_exercise_good)
     # plot_y_features(df_exercise_bad)
@@ -43,7 +50,7 @@ def main():
     plot_comparison_y_features(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
     evaluated = evaluate_dtw_values(pushups_good, pushups_bad)
 
-    median_value = evaluated.median()[0]
+    median_value = round(evaluated.median()[0])
     print("median: ", median_value)
     if median_value < 10:
         print("exercise is very good")
@@ -145,15 +152,6 @@ def read_json_file(file_path):
     return json_data["people"][0]
 
 
-'''
-Nose – 0, Neck – 1, Right Shoulder – 2, Right Elbow – 3, Right Wrist – 4,
-Left Shoulder – 5, Left Elbow – 6, Left Wrist – 7, Right Hip – 8,
-Right Knee – 9, Right Ankle – 10, Left Hip – 11, Left Knee – 12,
-LAnkle – 13, Right Eye – 14, Left Eye – 15, Right Ear – 16,
-Left Ear – 17, Background – 18
-'''
-
-
 def transform_and_transpose(raw_pd_pose_model):
     modeled_pd_pose_model = pd.DataFrame()
     model_rows_count = raw_pd_pose_model.shape[0]
@@ -167,9 +165,10 @@ def transform_and_transpose(raw_pd_pose_model):
     # rename columns
     modeled_pd_pose_model.columns = model_columns
     drop_specific_columns(modeled_pd_pose_model)
+    drop_zero_predominant_columns(modeled_pd_pose_model)
 
     # interpolate 0 values
-    # output.replace(0, np.nan, inplace=True)
+    modeled_pd_pose_model.replace(0, np.nan, inplace=True)
     modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
     return modeled_pd_pose_model
@@ -180,6 +179,20 @@ def drop_specific_columns(modeled_pd_pose_model):
         for column in modeled_pd_pose_model.columns:
             if column_to_drop in column:
                 modeled_pd_pose_model.drop(columns=[column], inplace=True)
+
+
+def drop_zero_predominant_columns(modeled_pd_pose_model):
+    rows_count = modeled_pd_pose_model.shape[0]
+    columns_to_drop = []
+    for column in modeled_pd_pose_model.columns:
+        if (modeled_pd_pose_model[column] == 0).sum() >= rows_count / 2:
+            column_to_drop = column[:-2]
+            columns_to_drop.append(column_to_drop)
+
+    columns_to_drop = list(set(columns_to_drop))
+    for column in columns_to_drop:
+        modeled_pd_pose_model.drop(columns=[column + "_x"], inplace=True)
+        modeled_pd_pose_model.drop(columns=[column + "_y"], inplace=True)
 
 
 def drop_confidence_columns(modeled_pd_pose_model):
