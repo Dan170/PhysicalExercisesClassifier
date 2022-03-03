@@ -9,6 +9,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
+# TODO: make method to detect body orientation for pushups
+# TODO: make method to detect when a repetition ends
+
 MAX_ROWS = 5
 MAX_COLUMNS = 4
 MAX_WIDTH = 1500
@@ -44,9 +47,9 @@ def main():
     pushups_exercise = "pushups"
     pullups_exercise = "pullups"
 
-    pushups_good = model_prepare(path + r'\goodpushups', 'good_pushups_example', pushups_good_label, False,
+    pushups_good = model_prepare(path + r'\good_pushups', 'good_pushups_example', pushups_good_label, False,
                                  pushups_exercise)
-    pushups_bad = model_prepare(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label, False,
+    pushups_bad = model_prepare(path + r'\good_pushups_front', 'good_pushups_example_front', pushups_bad_label, False,
                                 pushups_exercise)
 
     pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False,
@@ -64,11 +67,7 @@ def main():
 
     median_value = round(evaluated.median()[0])
     print("median: ", median_value)
-    if median_value < 10:
-        print("exercise is very good")
-    elif median_value < 15:
-        print("exercise is good")
-    elif median_value < 25:
+    if median_value < 25:
         print("exercise is ok")
     elif median_value < 35:
         print("exercise is incomplete")
@@ -99,7 +98,7 @@ def plot_compare_dataframes(df1, df2, label1, label2):
     df1_series = pd.Series(range(df1.shape[0]))
     df2_series = pd.Series(range(df2.shape[0]))
     for column in df1.columns:
-        if '_y' in column:
+        if '_y' in column and column in df2.columns:
             figure.add_trace(go.Scatter(x=df1_series, y=df1[column], name=column + "_" + label1), row=current_row,
                              col=current_column)
             figure.add_trace(go.Scatter(x=df2_series, y=df2[column], name=column + "_" + label2), row=current_row,
@@ -161,7 +160,8 @@ def create_pose_dataframe(folder_path, file_name):
 def read_json_file(file_path):
     with open(file_path) as json_file:
         json_data = json.load(json_file)
-    return json_data["people"][0]
+    if "people" in json_data and len(json_data["people"]) > 0:
+        return json_data["people"][0]
 
 
 def transform_and_transpose(raw_pd_pose_model, exercise_type):
