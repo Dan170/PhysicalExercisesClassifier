@@ -1,6 +1,5 @@
 import json
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import numpy as np
@@ -10,23 +9,29 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
+MAX_ROWS = 5
+MAX_COLUMNS = 4
+MAX_WIDTH = 1500
+MAX_HEIGHT = 1200
+
 KEYPOINTS_JSON = '_keypoints.json'
 
-pushups_columns_to_drop = ['wrist', 'ankle']
+PUSHUPS_COLUMNS_TO_DROP = ['wrist', 'elbow', 'ankle']
+PULLUPS_COLUMNS_TO_DROP = ['wrist', 'elbow']
+EMPTY_COLUMNS_TO_DROP = []
 
 '''
-Nose – 0, Neck – 1, Right Shoulder – 2, Right Elbow – 3, Right Wrist – 4,
-Left Shoulder – 5, Left Elbow – 6, Left Wrist – 7, Right Hip – 8,
-Right Knee – 9, Right Ankle – 10, Left Hip – 11, Left Knee – 12,
-LAnkle – 13, Right Eye – 14, Left Eye – 15, Right Ear – 16,
-Left Ear – 17, Background – 18
+Nose – 0, Neck – 1, Right Shoulder – 2, Right Elbow – 3, Right Wrist – 4, Left Shoulder – 5, Left Elbow – 6, 
+Left Wrist – 7, Right Hip – 8, Right Knee – 9, Right Ankle – 10, Left Hip – 11, Left Knee – 12, Left Ankle – 13, 
+Right Eye – 14, Left Eye – 15, Right Ear – 16, Left Ear – 17, Background – 18
 '''
-model_columns = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y', 'right_elbow_x', 'right_elbow_y',
-                 'right_wrist_x', 'right_wrist_y', 'left_shoulder_x', 'left_shoulder_y', 'left_elbow_x', 'left_elbow_y',
-                 'left_wrist_x', 'left_wrist_y', 'right_hip_x', 'right_hip_y', 'right_knee_x', 'right_knee_y',
-                 'right_ankle_x', 'right_ankle_y', 'left_hip_x', 'left_hip_y', 'left_knee_x', 'left_knee_y',
-                 'left_ankle_x', 'left_ankle_y', 'right_eye_x', 'right_eye_y', 'left_eye_x', 'left_eye_y',
-                 'right_ear_x', 'right_ear_y', 'left_ear_x', 'left_ear_y', 'background_x', 'background_y']
+POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y', 'right_elbow_x', 'right_elbow_y',
+                      'right_wrist_x', 'right_wrist_y', 'left_shoulder_x', 'left_shoulder_y', 'left_elbow_x',
+                      'left_elbow_y', 'left_wrist_x', 'left_wrist_y', 'right_hip_x', 'right_hip_y', 'right_knee_x',
+                      'right_knee_y', 'right_ankle_x', 'right_ankle_y', 'left_hip_x', 'left_hip_y', 'left_knee_x',
+                      'left_knee_y', 'left_ankle_x', 'left_ankle_y', 'right_eye_x', 'right_eye_y', 'left_eye_x',
+                      'left_eye_y', 'right_ear_x', 'right_ear_y', 'left_ear_x', 'left_ear_y', 'background_x',
+                      'background_y']
 
 
 def main():
@@ -36,19 +41,26 @@ def main():
     pullups_good_label = "pullups_good"
     pullups_bad_label = "pullups_bad"
 
-    pushups_good = model_prepare(path + r'\goodpushups', 'good_pushups_example', pushups_good_label, False)
-    pushups_bad = model_prepare(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label, False)
+    pushups_exercise = "pushups"
+    pullups_exercise = "pullups"
 
-    # pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False)
-    # pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False)
+    pushups_good = model_prepare(path + r'\goodpushups', 'good_pushups_example', pushups_good_label, False,
+                                 pushups_exercise)
+    pushups_bad = model_prepare(path + r'\badpushups', 'bad_pushups_example', pushups_bad_label, False,
+                                pushups_exercise)
+
+    pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False,
+                                 pullups_exercise)
+    pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False,
+                                pullups_exercise)
 
     # plot_y_features(df_exercise_good)
     # plot_y_features(df_exercise_bad)
     # plot_comparison_y_features(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
     # evaluated = evaluate_dtw_values(pushups_good, pushups_bad)
 
-    plot_comparison_y_features(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
-    evaluated = evaluate_dtw_values(pushups_good, pushups_bad)
+    plot_compare_dataframes(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
+    evaluated = evaluate_dtw_columns(pushups_good, pushups_bad)
 
     median_value = round(evaluated.median()[0])
     print("median: ", median_value)
@@ -64,62 +76,62 @@ def main():
         print("wrong exercise")
 
 
-def evaluate_dtw(df1, df2, feature):
-    x1 = range(df1.shape[0])
-    y1 = df1[feature].values
-    x2 = range(df2.shape[0])
-    y2 = df2[feature].values
-
+def evaluate_dynamic_time_warping(df1, df2, feature):
     dtw_value = dtw(df1[feature], df2[feature])
-    print("dtw_value for feature {} is {}".format(feature, dtw_value.normalizedDistance))
+    print("dtw normalized distance for feature {} is {}".format(feature, dtw_value.normalizedDistance))
 
     return dtw_value.normalizedDistance
 
 
-def evaluate_dtw_values(df1, df2):
+def evaluate_dtw_columns(df1, df2):
     dtw_values = []
-    for feature in df1.columns:
-        if '_y' in feature:
-            dtw_values.append(evaluate_dtw(df1, df2, feature))
+    for column in df1.columns:
+        if '_y' in column and column in df2.columns:
+            dtw_values.append(evaluate_dynamic_time_warping(df1, df2, column))
     return pd.DataFrame(dtw_values)
 
 
-def plot_comparison_y_features(df1, df2, label1, label2):
-    fig = make_subplots(rows=3, cols=6, start_cell="top-left")
-    r = 1
-    c = 1
-    X1 = pd.Series(range(df1.shape[0]))
-    X2 = pd.Series(range(df2.shape[0]))
-    for feature in df1.columns:
-        if '_y' in feature:
-            fig.add_trace(go.Scatter(x=X1, y=df1[feature], name=feature + "_" + label1), row=r, col=c)
-            fig.add_trace(go.Scatter(x=X2, y=df2[feature], name=feature + "_" + label2), row=r, col=c)
-            fig.update_xaxes(title_text=feature, row=r, col=c)
-            if c < 6:
-                c = c + 1
+def plot_compare_dataframes(df1, df2, label1, label2):
+    current_row = 1
+    current_column = 1
+
+    figure = make_subplots(rows=MAX_ROWS, cols=MAX_COLUMNS, start_cell="top-left")
+    df1_series = pd.Series(range(df1.shape[0]))
+    df2_series = pd.Series(range(df2.shape[0]))
+    for column in df1.columns:
+        if '_y' in column:
+            figure.add_trace(go.Scatter(x=df1_series, y=df1[column], name=column + "_" + label1), row=current_row,
+                             col=current_column)
+            figure.add_trace(go.Scatter(x=df2_series, y=df2[column], name=column + "_" + label2), row=current_row,
+                             col=current_column)
+            figure.update_xaxes(title_text=column, row=current_row, col=current_column)
+            if current_column < MAX_COLUMNS:
+                current_column = current_column + 1
             else:
-                c = 1
-                r = r + 1
-    fig.update_layout(title_text=label1 + " vs " + label2, width=2000, height=1000)
-    fig.show()
+                current_column = 1
+                current_row = current_row + 1
+    figure.update_layout(title_text=label1 + " vs " + label2, width=MAX_WIDTH, height=MAX_HEIGHT)
+    figure.show()
 
 
-def plot_y_features(df):
-    fig = make_subplots(rows=3, cols=6, start_cell="top-left")
-    r = 1
-    c = 1
-    X = pd.Series(range(df.shape[0]))
-    for feature in df.columns:
-        if '_y' in feature:
-            fig.add_trace(go.Scatter(x=X, y=df[feature], name=feature), row=r, col=c)
-            fig.update_xaxes(title_text=feature, row=r, col=c)
-            if c < 6:
-                c = c + 1
+def plot_dataframe(df, label):
+    current_row = 1
+    current_column = 1
+
+    figure = make_subplots(rows=MAX_ROWS, cols=MAX_COLUMNS, start_cell="top-left")
+    df_series = pd.Series(range(df.shape[0]))
+    for column in df.columns:
+        if '_y' in column:
+            figure.add_trace(go.Scatter(x=df_series, y=df[column], name=column + column), row=current_row,
+                             col=current_column)
+            figure.update_xaxes(title_text=column, row=current_row, col=current_column)
+            if current_column < MAX_COLUMNS:
+                current_column = current_column + 1
             else:
-                c = 1
-                r = r + 1
-    fig.update_layout(title_text="Exercise y-axis movements breakdown", width=2000, height=1000)
-    fig.show()
+                current_column = 1
+                current_row = current_row + 1
+    figure.update_layout(title_text=label, width=MAX_WIDTH, height=MAX_HEIGHT)
+    figure.show()
 
 
 def create_pose_dataframe(folder_path, file_name):
@@ -152,7 +164,7 @@ def read_json_file(file_path):
     return json_data["people"][0]
 
 
-def transform_and_transpose(raw_pd_pose_model):
+def transform_and_transpose(raw_pd_pose_model, exercise_type):
     modeled_pd_pose_model = pd.DataFrame()
     model_rows_count = raw_pd_pose_model.shape[0]
     for i in range(model_rows_count - 1):
@@ -162,20 +174,27 @@ def transform_and_transpose(raw_pd_pose_model):
 
     drop_confidence_columns(modeled_pd_pose_model)
 
-    # rename columns
-    modeled_pd_pose_model.columns = model_columns
-    drop_specific_columns(modeled_pd_pose_model)
+    modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
+    switch_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
     drop_zero_predominant_columns(modeled_pd_pose_model)
 
-    # interpolate 0 values
     modeled_pd_pose_model.replace(0, np.nan, inplace=True)
     modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
     return modeled_pd_pose_model
 
 
-def drop_specific_columns(modeled_pd_pose_model):
-    for column_to_drop in pushups_columns_to_drop:
+def switch_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
+    if exercise_type == 'pushups':
+        drop_specific_columns(modeled_pd_pose_model, PUSHUPS_COLUMNS_TO_DROP)
+    elif exercise_type == 'pullups':
+        drop_specific_columns(modeled_pd_pose_model, PULLUPS_COLUMNS_TO_DROP)
+    else:
+        drop_specific_columns(modeled_pd_pose_model, EMPTY_COLUMNS_TO_DROP)
+
+
+def drop_specific_columns(modeled_pd_pose_model, columns_to_drop):
+    for column_to_drop in columns_to_drop:
         for column in modeled_pd_pose_model.columns:
             if column_to_drop in column:
                 modeled_pd_pose_model.drop(columns=[column], inplace=True)
@@ -201,9 +220,9 @@ def drop_confidence_columns(modeled_pd_pose_model):
         modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
 
-def model_prepare(folder_path, file_name, label, save_model):
+def model_prepare(folder_path, file_name, label, save_model, exercise_type):
     raw_pd_pose_model = create_pose_dataframe(folder_path, file_name)
-    modeled_pd_pose_model = transform_and_transpose(raw_pd_pose_model)
+    modeled_pd_pose_model = transform_and_transpose(raw_pd_pose_model, exercise_type)
     if save_model:
         save_to_pickle(modeled_pd_pose_model, label)
     return modeled_pd_pose_model
