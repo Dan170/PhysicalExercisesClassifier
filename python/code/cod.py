@@ -11,6 +11,9 @@ import plotly.express as px
 
 # TODO: make method to detect when a repetition ends
 
+KEYPOINTS_JSON = '_keypoints.json'
+PATH = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
+
 MAX_ROWS = 5
 MAX_COLUMNS = 4
 MAX_WIDTH = 1500
@@ -24,9 +27,6 @@ RIGHT = "_RIGHT"
 LEFT = "_LEFT"
 MULTIPLE = "_MULTIPLE"
 BAD = "_BAD"
-
-KEYPOINTS_JSON = '_keypoints.json'
-PATH = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
 
 PUSHUPS_LEFT = PUSHUPS + LEFT
 PUSHUPS_RIGHT = PUSHUPS + RIGHT
@@ -51,24 +51,34 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 
 def main():
-    dataframe, side_detected = model_prepare(PUSHUPS_RIGHT+BAD, False, PUSHUPS)
-    df2 = load_correct_model(side_detected)
-    # plot_compare_dataframes(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
-    evaluated = evaluate_dtw_columns(dataframe, df2)
+    exercise_type = PUSHUPS
+    file_name = PUSHUPS_FRONT
+    save_model_to_pickle = False
 
-    median_value = round(evaluated.median()[0])
+    dataframe, side_detected = model_prepare(file_name, save_model_to_pickle, exercise_type)
+    correct_dataframe, correct_file_name = load_correct_model(side_detected)
+
+    plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
+
+    evaluate_dataframe(dataframe, correct_dataframe)
+
+
+def evaluate_dataframe(dataframe, correct_dataframe):
+    evaluated_dataframe = evaluate_dtw_columns(dataframe, correct_dataframe)
+
+    median_value = round(evaluated_dataframe.median()[0])
     print("median: ", median_value)
     if median_value < 25:
-        print("exercise is ok")
+        print("Exercise is ok")
     elif median_value < 35:
-        print("exercise is incomplete")
+        print("Exercise is incomplete")
     else:
-        print("wrong exercise")
+        print("Wrong exercise")
 
 
 def evaluate_dynamic_time_warping(df1, df2, feature):
     dtw_value = dtw(df1[feature], df2[feature])
-    print("dtw normalized distance for feature {} is {}".format(feature, dtw_value.normalizedDistance))
+    print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
 
     return dtw_value.normalizedDistance
 
@@ -82,13 +92,13 @@ def evaluate_dtw_columns(df1, df2):
 
 
 def load_correct_model(side_detected):
-    print("side detected: ", side_detected)
+    print("Side detected: ", side_detected)
     if side_detected is PULLUPS:
-        return load_from_pickle(PULLUPS + ".pkl")
+        return load_from_pickle(PULLUPS + ".pkl"), PULLUPS
     elif side_detected is LEFT:
-        return load_from_pickle(PUSHUPS_LEFT + ".pkl")
+        return load_from_pickle(PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
     elif side_detected is RIGHT:
-        return load_from_pickle(PUSHUPS_RIGHT + ".pkl")
+        return load_from_pickle(PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
 
 
 def plot_compare_dataframes(df1, df2, label1, label2):
@@ -253,7 +263,7 @@ def save_to_pickle(modeled_pd_pose_model, file_name):
 
 
 def load_from_pickle(file_name):
-    print("loaded ", file_name)
+    print("Loaded ", file_name)
     return pd.read_pickle(file_name)
 
 
