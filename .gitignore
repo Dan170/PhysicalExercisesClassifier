@@ -130,3 +130,6 @@ dmypy.json
 
 # IDEA
 .idea
+
+# PROJECT RELATED FILES
+.examples
