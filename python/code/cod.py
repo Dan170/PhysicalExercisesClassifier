@@ -9,7 +9,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
-# TODO: make method to detect body orientation for pushups
 # TODO: make method to detect when a repetition ends
 
 MAX_ROWS = 5
@@ -17,7 +16,26 @@ MAX_COLUMNS = 4
 MAX_WIDTH = 1500
 MAX_HEIGHT = 1200
 
+PUSHUPS = "PUSHUPS"
+PULLUPS = "PULLUPS"
+
+FRONT = "_FRONT"
+RIGHT = "_RIGHT"
+LEFT = "_LEFT"
+MULTIPLE = "_MULTIPLE"
+BAD = "_BAD"
+
 KEYPOINTS_JSON = '_keypoints.json'
+PATH = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
+
+PUSHUPS_LEFT = PUSHUPS + LEFT
+PUSHUPS_RIGHT = PUSHUPS + RIGHT
+PUSHUPS_FRONT = PUSHUPS + FRONT
+
+pushups_good_label = "pushups_good_right"
+pushups_bad_label = "pushups_good_left"
+pullups_good_label = "pullups_good"
+pullups_bad_label = "pullups_bad"
 
 PUSHUPS_COLUMNS_TO_DROP = ['wrist', 'elbow', 'ankle']
 PULLUPS_COLUMNS_TO_DROP = ['wrist', 'elbow']
@@ -38,32 +56,13 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 
 def main():
-    path = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
-    pushups_good_label = "pushups_good"
-    pushups_bad_label = "pushups_bad"
-    pullups_good_label = "pullups_good"
-    pullups_bad_label = "pullups_bad"
+    pushups_good, side_detected = model_prepare(PUSHUPS_RIGHT, False, PUSHUPS)
 
-    pushups_exercise = "pushups"
-    pullups_exercise = "pullups"
-
-    pushups_good = model_prepare(path + r'\good_pushups', 'good_pushups_example', pushups_good_label, False,
-                                 pushups_exercise)
-    pushups_bad = model_prepare(path + r'\good_pushups_front', 'good_pushups_example_front', pushups_bad_label, False,
-                                pushups_exercise)
-
-    pullups_good = model_prepare(path + r'\goodpullups', 'good_pullups_example', pullups_good_label, False,
-                                 pullups_exercise)
-    pullups_bad = model_prepare(path + r'\badpullups', 'bad_pullups_example', pullups_bad_label, False,
-                                pullups_exercise)
-
-    # plot_y_features(df_exercise_good)
-    # plot_y_features(df_exercise_bad)
     # plot_comparison_y_features(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
     # evaluated = evaluate_dtw_values(pushups_good, pushups_bad)
 
-    plot_compare_dataframes(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
-    evaluated = evaluate_dtw_columns(pushups_good, pushups_bad)
+    # plot_compare_dataframes(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
+    evaluated = evaluate_dtw_columns(pushups_good, side_detected)
 
     median_value = round(evaluated.median()[0])
     print("median: ", median_value)
@@ -82,12 +81,23 @@ def evaluate_dynamic_time_warping(df1, df2, feature):
     return dtw_value.normalizedDistance
 
 
-def evaluate_dtw_columns(df1, df2):
+def evaluate_dtw_columns(df1, side_detected):
+    df2 = load_correct_model(side_detected)
     dtw_values = []
     for column in df1.columns:
         if '_y' in column and column in df2.columns:
             dtw_values.append(evaluate_dynamic_time_warping(df1, df2, column))
     return pd.DataFrame(dtw_values)
+
+
+def load_correct_model(side_detected):
+    print("side detected: ", side_detected)
+    if side_detected is PULLUPS:
+        return load_from_pickle(PULLUPS + ".pkl")
+    elif side_detected is LEFT:
+        return load_from_pickle(PUSHUPS_LEFT + ".pkl")
+    elif side_detected is RIGHT:
+        return load_from_pickle(PUSHUPS_RIGHT + ".pkl")
 
 
 def plot_compare_dataframes(df1, df2, label1, label2):
@@ -133,7 +143,8 @@ def plot_dataframe(df, label):
     figure.show()
 
 
-def create_pose_dataframe(folder_path, file_name):
+def create_pose_dataframe(file_name):
+    folder_path = PATH + '\\' + file_name
     try:
         _, _, files = next(os.walk(folder_path))
         dataframe = pd.DataFrame()
@@ -164,7 +175,7 @@ def read_json_file(file_path):
         return json_data["people"][0]
 
 
-def transform_and_transpose(raw_pd_pose_model, exercise_type):
+def transform_model(raw_pd_pose_model, exercise_type):
     modeled_pd_pose_model = pd.DataFrame()
     model_rows_count = raw_pd_pose_model.shape[0]
     for i in range(model_rows_count - 1):
@@ -175,16 +186,34 @@ def transform_and_transpose(raw_pd_pose_model, exercise_type):
     drop_confidence_columns(modeled_pd_pose_model)
 
     modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
-    switch_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
+    find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
+    side_detected = PULLUPS
+    if exercise_type is PUSHUPS:
+        side_detected = find_pushups_side(modeled_pd_pose_model)
     drop_zero_predominant_columns(modeled_pd_pose_model)
 
+    return modeled_pd_pose_model, side_detected
+
+
+def interpolate_model(modeled_pd_pose_model):
     modeled_pd_pose_model.replace(0, np.nan, inplace=True)
     modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
     return modeled_pd_pose_model
 
 
-def switch_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
+def find_pushups_side(modeled_pd_pose_model):
+    left_ear_count = (modeled_pd_pose_model["left_ear_y"] != 0).sum()
+    right_ear_count = (modeled_pd_pose_model["right_ear_y"] != 0).sum()
+    if left_ear_count > right_ear_count:
+        print("left side detected")
+        return LEFT
+    else:
+        print("right side detected")
+        return RIGHT
+
+
+def find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
     if exercise_type == 'pushups':
         drop_specific_columns(modeled_pd_pose_model, PUSHUPS_COLUMNS_TO_DROP)
     elif exercise_type == 'pullups':
@@ -220,21 +249,23 @@ def drop_confidence_columns(modeled_pd_pose_model):
         modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
 
-def model_prepare(folder_path, file_name, label, save_model, exercise_type):
-    raw_pd_pose_model = create_pose_dataframe(folder_path, file_name)
-    modeled_pd_pose_model = transform_and_transpose(raw_pd_pose_model, exercise_type)
+def model_prepare(file_name, save_model, exercise_type):
+    raw_pd_pose_model = create_pose_dataframe(file_name)
+    modeled_pd_pose_model, side_detected = transform_model(raw_pd_pose_model, exercise_type)
+    modeled_pd_pose_model = interpolate_model(modeled_pd_pose_model)
     if save_model:
-        save_to_pickle(modeled_pd_pose_model, label)
-    return modeled_pd_pose_model
+        save_to_pickle(modeled_pd_pose_model, file_name)
+    return modeled_pd_pose_model, side_detected
 
 
-def save_to_pickle(modeled_pd_pose_model, label):
-    modeled_pd_pose_model.to_pickle(label + ".pkl")
-    print("model ", label, " saved to ", label + ".pkl")
+def save_to_pickle(modeled_pd_pose_model, file_name):
+    modeled_pd_pose_model.to_pickle(file_name + ".pkl")
+    print("model ", file_name, " saved to ", file_name + ".pkl")
 
 
-def load_from_pickle(label):
-    return pd.read_pickle(label + ".pkl")
+def load_from_pickle(file_name):
+    print("loaded ", file_name)
+    return pd.read_pickle(file_name)
 
 
 if __name__ == '__main__':
