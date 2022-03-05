@@ -32,11 +32,6 @@ PUSHUPS_LEFT = PUSHUPS + LEFT
 PUSHUPS_RIGHT = PUSHUPS + RIGHT
 PUSHUPS_FRONT = PUSHUPS + FRONT
 
-pushups_good_label = "pushups_good_right"
-pushups_bad_label = "pushups_good_left"
-pullups_good_label = "pullups_good"
-pullups_bad_label = "pullups_bad"
-
 PUSHUPS_COLUMNS_TO_DROP = ['wrist', 'elbow', 'ankle']
 PULLUPS_COLUMNS_TO_DROP = ['wrist', 'elbow']
 EMPTY_COLUMNS_TO_DROP = []
@@ -56,13 +51,10 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 
 def main():
-    pushups_good, side_detected = model_prepare(PUSHUPS_RIGHT, False, PUSHUPS)
-
-    # plot_comparison_y_features(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
-    # evaluated = evaluate_dtw_values(pushups_good, pushups_bad)
-
+    dataframe, side_detected = model_prepare(PUSHUPS_RIGHT+BAD, False, PUSHUPS)
+    df2 = load_correct_model(side_detected)
     # plot_compare_dataframes(pushups_good, pushups_bad, pushups_good_label, pushups_bad_label)
-    evaluated = evaluate_dtw_columns(pushups_good, side_detected)
+    evaluated = evaluate_dtw_columns(dataframe, df2)
 
     median_value = round(evaluated.median()[0])
     print("median: ", median_value)
@@ -81,8 +73,7 @@ def evaluate_dynamic_time_warping(df1, df2, feature):
     return dtw_value.normalizedDistance
 
 
-def evaluate_dtw_columns(df1, side_detected):
-    df2 = load_correct_model(side_detected)
+def evaluate_dtw_columns(df1, df2):
     dtw_values = []
     for column in df1.columns:
         if '_y' in column and column in df2.columns:
@@ -206,17 +197,15 @@ def find_pushups_side(modeled_pd_pose_model):
     left_ear_count = (modeled_pd_pose_model["left_ear_y"] != 0).sum()
     right_ear_count = (modeled_pd_pose_model["right_ear_y"] != 0).sum()
     if left_ear_count > right_ear_count:
-        print("left side detected")
         return LEFT
     else:
-        print("right side detected")
         return RIGHT
 
 
 def find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
-    if exercise_type == 'pushups':
+    if exercise_type == PUSHUPS:
         drop_specific_columns(modeled_pd_pose_model, PUSHUPS_COLUMNS_TO_DROP)
-    elif exercise_type == 'pullups':
+    elif exercise_type == PULLUPS:
         drop_specific_columns(modeled_pd_pose_model, PULLUPS_COLUMNS_TO_DROP)
     else:
         drop_specific_columns(modeled_pd_pose_model, EMPTY_COLUMNS_TO_DROP)
