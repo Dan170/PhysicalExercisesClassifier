@@ -28,6 +28,9 @@ LEFT = "_LEFT"
 MULTIPLE = "_MULTIPLE"
 BAD = "_BAD"
 
+ASCENDING = "ASCENDING"
+DESCENDING = "DESCENDING"
+
 PUSHUPS_LEFT = PUSHUPS + LEFT
 PUSHUPS_RIGHT = PUSHUPS + RIGHT
 PUSHUPS_FRONT = PUSHUPS + FRONT
@@ -52,15 +55,55 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 def main():
     exercise_type = PUSHUPS
-    file_name = PUSHUPS_FRONT
+    file_name = PUSHUPS_LEFT
     save_model_to_pickle = False
 
     dataframe, side_detected = model_prepare(file_name, save_model_to_pickle, exercise_type)
     correct_dataframe, correct_file_name = load_correct_model(side_detected)
 
-    plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
+    # plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
 
+    split_dataframe(dataframe)
+    # dataframe.iloc[:10, :]
     evaluate_dataframe(dataframe, correct_dataframe)
+
+
+def split_dataframe(dataframe):
+    dataframe_values = dataframe["nose_y"].values
+    dataframe_length = len(dataframe_values)
+    starting_value = dataframe_values[0]
+    previous_value = starting_value
+    graph_type = get_graph_type(dataframe_values)
+    print("Found graph type: ", graph_type)
+    found_extreme = False
+    dataframes = []
+
+    for index, current_value in enumerate(dataframe_values):
+        if graph_type is ASCENDING:
+            if current_value > previous_value and found_extreme is False:
+                previous_value = current_value
+                continue
+
+            if dataframe_length > index + 2 and current_value > dataframe_values[index + 2]:
+                found_extreme = True
+                previous_value = current_value
+                continue
+
+            if current_value > previous_value and found_extreme is True:
+                dataframes = dataframes.append(dataframe.iloc[:index - 1, :])
+                found_extreme = False
+                previous_value = current_value
+
+
+def get_graph_type(dataframe_values):
+    starting_value = dataframe_values[0]
+    dataframe_length = len(dataframe_values)
+
+    if dataframe_length > 15:
+        if starting_value > dataframe_values[15]:
+            return DESCENDING
+        else:
+            return ASCENDING
 
 
 def evaluate_dataframe(dataframe, correct_dataframe):
@@ -258,13 +301,13 @@ def model_prepare(file_name, save_model, exercise_type):
 
 
 def save_to_pickle(modeled_pd_pose_model, file_name):
-    modeled_pd_pose_model.to_pickle(file_name + ".pkl")
+    modeled_pd_pose_model.to_pickle("./dataframes/" + file_name + ".pkl")
     print("model ", file_name, " saved to ", file_name + ".pkl")
 
 
 def load_from_pickle(file_name):
     print("Loaded ", file_name)
-    return pd.read_pickle(file_name)
+    return pd.read_pickle("./dataframes/" + file_name)
 
 
 if __name__ == '__main__':
