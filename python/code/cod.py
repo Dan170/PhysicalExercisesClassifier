@@ -52,7 +52,7 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 def main():
     exercise_type = PUSHUPS
-    file_name = PUSHUPS_LEFT + "2" + MULTIPLE
+    file_name = PUSHUPS_FRONT + MULTIPLE
     save_model_to_pickle = False
 
     dataframe, side_detected = model_prepare(file_name, save_model_to_pickle, exercise_type)
@@ -84,13 +84,16 @@ def split_dataframe(dataframe):
         if graph_type is ASCENDING:
             # first if clause is checking if the values are still increasing. After that, we suppose that the values
             # started decreasing
-            if (current_value >= previous_value
-                or (dataframe_length > index + 1 and current_value <= dataframe_values[index + 1])) \
-                    and found_extreme is False:
+            if found_extreme is False and (
+                    current_value >= previous_value or (dataframe_length > index + 1 and (
+                    current_value <= dataframe_values[index + 1]
+                    or check_abs(current_value, dataframe_values[index + 1])))):
                 previous_value = current_value
                 continue
 
-            if dataframe_length > index + 1 and current_value > dataframe_values[index + 1]:
+            if dataframe_length > index + 1 and \
+                    (current_value > dataframe_values[index + 1]
+                     or check_abs(current_value, dataframe_values[index + 1])):
                 found_extreme = True
                 previous_value = current_value
             elif index + 1 is dataframe_length:
@@ -105,6 +108,10 @@ def split_dataframe(dataframe):
                 previous_value = current_value
 
     return dataframes
+
+
+def check_abs(value1, value2):
+    return abs(round(value1) - round(value2)) <= 2
 
 
 def get_graph_type(dataframe_values):
