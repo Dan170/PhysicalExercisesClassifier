@@ -7,9 +7,6 @@ from dtw import dtw
 from sklearn.preprocessing import MinMaxScaler
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
-
-# TODO: make method to detect when a repetition ends
 
 KEYPOINTS_JSON = '_keypoints.json'
 PATH = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
@@ -55,24 +52,29 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 def main():
     exercise_type = PUSHUPS
-    file_name = PUSHUPS_LEFT
+    file_name = PUSHUPS_LEFT + "2" + MULTIPLE
     save_model_to_pickle = False
 
     dataframe, side_detected = model_prepare(file_name, save_model_to_pickle, exercise_type)
     correct_dataframe, correct_file_name = load_correct_model(side_detected)
 
-    # plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
+    plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
 
-    split_dataframe(dataframe)
-    # dataframe.iloc[:10, :]
-    evaluate_dataframe(dataframe, correct_dataframe)
+    dataframes = split_dataframe(dataframe)
+    print("Found {} {}".format(len(dataframes), exercise_type))
+
+    for index, split_df in enumerate(dataframes):
+        print("||||||||||||  For {} number {}".format(exercise_type, index))
+        # plot_dataframe(split_dataframe, file_name + str(index))
+        plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT", file_name + str(index))
+        evaluate_dataframe(split_df, correct_dataframe)
 
 
 def split_dataframe(dataframe):
     dataframe_values = dataframe["nose_y"].values
     dataframe_length = len(dataframe_values)
-    starting_value = dataframe_values[0]
-    previous_value = starting_value
+    previous_value = dataframe_values[0]
+    starting_index = 0
     graph_type = get_graph_type(dataframe_values)
     print("Found graph type: ", graph_type)
     found_extreme = False
@@ -80,19 +82,29 @@ def split_dataframe(dataframe):
 
     for index, current_value in enumerate(dataframe_values):
         if graph_type is ASCENDING:
-            if current_value > previous_value and found_extreme is False:
+            # first if clause is checking if the values are still increasing. After that, we suppose that the values
+            # started decreasing
+            if (current_value >= previous_value
+                or (dataframe_length > index + 1 and current_value <= dataframe_values[index + 1])) \
+                    and found_extreme is False:
                 previous_value = current_value
                 continue
 
-            if dataframe_length > index + 2 and current_value > dataframe_values[index + 2]:
+            if dataframe_length > index + 1 and current_value > dataframe_values[index + 1]:
                 found_extreme = True
                 previous_value = current_value
-                continue
-
-            if current_value > previous_value and found_extreme is True:
-                dataframes = dataframes.append(dataframe.iloc[:index - 1, :])
+            elif index + 1 is dataframe_length:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                break
+            else:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                starting_index = index
                 found_extreme = False
                 previous_value = current_value
+
+    return dataframes
 
 
 def get_graph_type(dataframe_values):
@@ -121,7 +133,7 @@ def evaluate_dataframe(dataframe, correct_dataframe):
 
 def evaluate_dynamic_time_warping(df1, df2, feature):
     dtw_value = dtw(df1[feature], df2[feature])
-    print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
+    # print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
 
     return dtw_value.normalizedDistance
 
@@ -163,7 +175,7 @@ def plot_compare_dataframes(df1, df2, label1, label2):
             else:
                 current_column = 1
                 current_row = current_row + 1
-    figure.update_layout(title_text=label1 + " vs " + label2, width=MAX_WIDTH, height=MAX_HEIGHT)
+    figure.update_layout(title_text=label1 + " vs " + label2, width=MAX_WIDTH, height=MAX_HEIGHT, hovermode="x")
     figure.show()
 
 
