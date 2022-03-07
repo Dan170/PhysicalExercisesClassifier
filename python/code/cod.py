@@ -51,11 +51,10 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 
 
 def main():
-    exercise_type = PUSHUPS
     file_name = PUSHUPS_FRONT + MULTIPLE
     save_model_to_pickle = False
 
-    dataframe, side_detected = model_prepare(file_name, save_model_to_pickle, exercise_type)
+    dataframe, side_detected, exercise_type = model_prepare(file_name, save_model_to_pickle)
     correct_dataframe, correct_file_name = load_correct_model(side_detected)
 
     plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
@@ -238,7 +237,7 @@ def read_json_file(file_path):
         return json_data["people"][0]
 
 
-def transform_model(raw_pd_pose_model, exercise_type):
+def transform_model(raw_pd_pose_model):
     modeled_pd_pose_model = pd.DataFrame()
     model_rows_count = raw_pd_pose_model.shape[0]
     for i in range(model_rows_count - 1):
@@ -247,25 +246,18 @@ def transform_model(raw_pd_pose_model, exercise_type):
                 pd.DataFrame(raw_pd_pose_model["pose_keypoints_2d"][i]).T)
 
     drop_confidence_columns(modeled_pd_pose_model)
-
     modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
-    find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
-    side_detected = PULLUPS
-    if exercise_type is PUSHUPS:
-        side_detected = find_pushups_side(modeled_pd_pose_model)
     drop_zero_predominant_columns(modeled_pd_pose_model)
 
-    return modeled_pd_pose_model, side_detected
+    return modeled_pd_pose_model
 
 
 def interpolate_model(modeled_pd_pose_model):
     modeled_pd_pose_model.replace(0, np.nan, inplace=True)
     modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
-    return modeled_pd_pose_model
 
-
-def find_pushups_side(modeled_pd_pose_model):
+def find_side(modeled_pd_pose_model):
     left_ear_count = (modeled_pd_pose_model["left_ear_y"] != 0).sum()
     right_ear_count = (modeled_pd_pose_model["right_ear_y"] != 0).sum()
     if left_ear_count > right_ear_count:
@@ -310,13 +302,27 @@ def drop_confidence_columns(modeled_pd_pose_model):
         modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
 
-def model_prepare(file_name, save_model, exercise_type):
+def model_prepare(file_name, save_model):
     raw_pd_pose_model = create_pose_dataframe(file_name)
-    modeled_pd_pose_model, side_detected = transform_model(raw_pd_pose_model, exercise_type)
-    modeled_pd_pose_model = interpolate_model(modeled_pd_pose_model)
+    modeled_pd_pose_model = transform_model(raw_pd_pose_model)
+
+    side_detected = find_side(modeled_pd_pose_model)
+    interpolate_model(modeled_pd_pose_model)
+
+    dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
+    # TODO: at this point ML comes and detects the exercise. no need for exercise_type to be a parameter anymore
+
+    exercise_type = find_exercise_type(dataframe_for_ml)
+
+    find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
     if save_model:
         save_to_pickle(modeled_pd_pose_model, file_name)
-    return modeled_pd_pose_model, side_detected
+    return modeled_pd_pose_model, side_detected, exercise_type
+
+
+def find_exercise_type(dataframe_for_ml):
+    exercise_type = PUSHUPS
+    return exercise_type
 
 
 def save_to_pickle(modeled_pd_pose_model, file_name):
