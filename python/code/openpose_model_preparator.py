@@ -4,7 +4,6 @@ import pandas as pd
 import os
 import numpy as np
 from dtw import dtw
-from sklearn.preprocessing import MinMaxScaler
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -55,11 +54,11 @@ def main():
     save_model_to_pickle = False
 
     dataframe, side_detected, exercise_type = model_prepare(file_name, save_model_to_pickle)
-    correct_dataframe, correct_file_name = load_correct_model(side_detected)
+    correct_dataframe, correct_file_name = __load_correct_model(side_detected)
 
     plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
 
-    dataframes = split_dataframe(dataframe)
+    dataframes = __split_dataframe(dataframe)
     print("Found {} {}".format(len(dataframes), exercise_type))
 
     for index, split_df in enumerate(dataframes):
@@ -69,63 +68,8 @@ def main():
         evaluate_dataframe(split_df, correct_dataframe)
 
 
-def split_dataframe(dataframe):
-    dataframe_values = dataframe["nose_y"].values
-    dataframe_length = len(dataframe_values)
-    previous_value = dataframe_values[0]
-    starting_index = 0
-    graph_type = get_graph_type(dataframe_values)
-    print("Found graph type: ", graph_type)
-    found_extreme = False
-    dataframes = []
-
-    for index, current_value in enumerate(dataframe_values):
-        if graph_type is ASCENDING:
-            # first if clause is checking if the values are still increasing. After that, we suppose that the values
-            # started decreasing
-            if found_extreme is False and (
-                    current_value >= previous_value or (dataframe_length > index + 1 and (
-                    current_value <= dataframe_values[index + 1]
-                    or check_abs(current_value, dataframe_values[index + 1])))):
-                previous_value = current_value
-                continue
-
-            if dataframe_length > index + 1 and \
-                    (current_value > dataframe_values[index + 1]
-                     or check_abs(current_value, dataframe_values[index + 1])):
-                found_extreme = True
-                previous_value = current_value
-            elif index + 1 is dataframe_length:
-                split_df = dataframe.iloc[starting_index:index + 1, :]
-                dataframes.append(split_df)
-                break
-            else:
-                split_df = dataframe.iloc[starting_index:index + 1, :]
-                dataframes.append(split_df)
-                starting_index = index
-                found_extreme = False
-                previous_value = current_value
-
-    return dataframes
-
-
-def check_abs(value1, value2):
-    return abs(round(value1) - round(value2)) <= 2
-
-
-def get_graph_type(dataframe_values):
-    starting_value = dataframe_values[0]
-    dataframe_length = len(dataframe_values)
-
-    if dataframe_length > 15:
-        if starting_value > dataframe_values[15]:
-            return DESCENDING
-        else:
-            return ASCENDING
-
-
 def evaluate_dataframe(dataframe, correct_dataframe):
-    evaluated_dataframe = evaluate_dtw_columns(dataframe, correct_dataframe)
+    evaluated_dataframe = __evaluate_dtw_columns(dataframe, correct_dataframe)
 
     median_value = round(evaluated_dataframe.median()[0])
     print("median: ", median_value)
@@ -137,29 +81,27 @@ def evaluate_dataframe(dataframe, correct_dataframe):
         print("Wrong exercise")
 
 
-def evaluate_dynamic_time_warping(df1, df2, feature):
-    dtw_value = dtw(df1[feature], df2[feature])
-    # print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
+def model_prepare(file_name, save_model):
+    raw_pd_pose_model = __create_pose_dataframe(file_name)
+    modeled_pd_pose_model = __transform_model(raw_pd_pose_model)
 
-    return dtw_value.normalizedDistance
+    side_detected = __find_side(modeled_pd_pose_model)
+    __interpolate_model(modeled_pd_pose_model)
+
+    dataframe_for_ml = __split_dataframe(modeled_pd_pose_model)[0]
+    # TODO: at this point ML comes and detects the exercise. no need for exercise_type to be a parameter anymore
+
+    exercise_type = find_exercise_type(dataframe_for_ml)
+
+    __find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
+    if save_model:
+        __save_to_pickle(modeled_pd_pose_model, file_name)
+    return modeled_pd_pose_model, side_detected, exercise_type
 
 
-def evaluate_dtw_columns(df1, df2):
-    dtw_values = []
-    for column in df1.columns:
-        if '_y' in column and column in df2.columns:
-            dtw_values.append(evaluate_dynamic_time_warping(df1, df2, column))
-    return pd.DataFrame(dtw_values)
-
-
-def load_correct_model(side_detected):
-    print("Side detected: ", side_detected)
-    if side_detected is PULLUPS:
-        return load_from_pickle(PULLUPS + ".pkl"), PULLUPS
-    elif side_detected is LEFT:
-        return load_from_pickle(PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
-    elif side_detected is RIGHT:
-        return load_from_pickle(PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
+def find_exercise_type(dataframe_for_ml):
+    exercise_type = PUSHUPS
+    return exercise_type
 
 
 def plot_compare_dataframes(df1, df2, label1, label2):
@@ -205,7 +147,49 @@ def plot_dataframe(df, label):
     figure.show()
 
 
-def create_pose_dataframe(file_name):
+def load_from_pickle(file_name):
+    print("Loaded ", file_name)
+    return pd.read_pickle("./dataframes/" + file_name)
+
+
+def __check_abs(value1, value2):
+    return abs(round(value1) - round(value2)) <= 2
+
+
+def __get_graph_type(dataframe_values):
+    starting_value = dataframe_values[0]
+    dataframe_length = len(dataframe_values)
+
+    if dataframe_length > 15:
+        if starting_value > dataframe_values[15]:
+            return DESCENDING
+        else:
+            return ASCENDING
+
+
+def __evaluate_dynamic_time_warping(df1, df2, feature):
+    dtw_value = dtw(df1[feature], df2[feature])
+    # print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
+
+    return dtw_value.normalizedDistance
+
+
+def __evaluate_dtw_columns(df1, df2):
+    dtw_values = []
+    for column in df1.columns:
+        if '_y' in column and column in df2.columns:
+            dtw_values.append(__evaluate_dynamic_time_warping(df1, df2, column))
+    return pd.DataFrame(dtw_values)
+
+
+def __read_json_file(file_path):
+    with open(file_path) as json_file:
+        json_data = json.load(json_file)
+    if "people" in json_data and len(json_data["people"]) > 0:
+        return json_data["people"][0]
+
+
+def __create_pose_dataframe(file_name):
     folder_path = PATH + '\\' + file_name
     try:
         _, _, files = next(os.walk(folder_path))
@@ -213,16 +197,16 @@ def create_pose_dataframe(file_name):
         for i in range(len(files)):
             if i <= 9:
                 file_path = folder_path + '\\' + file_name + '_00000000000' + str(i) + KEYPOINTS_JSON
-                json_data = read_json_file(file_path)
+                json_data = __read_json_file(file_path)
             elif i <= 99:
                 file_path = folder_path + '\\' + file_name + '_0000000000' + str(i) + KEYPOINTS_JSON
-                json_data = read_json_file(file_path)
+                json_data = __read_json_file(file_path)
             elif i <= 999:
                 file_path = folder_path + '\\' + file_name + '_000000000' + str(i) + KEYPOINTS_JSON
-                json_data = read_json_file(file_path)
+                json_data = __read_json_file(file_path)
             else:
                 file_path = folder_path + '\\' + file_name + '_00000000' + str(i) + KEYPOINTS_JSON
-                json_data = read_json_file(file_path)
+                json_data = __read_json_file(file_path)
 
             dataframe = dataframe.append(json_data, ignore_index=True)
         return dataframe
@@ -230,34 +214,12 @@ def create_pose_dataframe(file_name):
         print(ex)
 
 
-def read_json_file(file_path):
-    with open(file_path) as json_file:
-        json_data = json.load(json_file)
-    if "people" in json_data and len(json_data["people"]) > 0:
-        return json_data["people"][0]
-
-
-def transform_model(raw_pd_pose_model):
-    modeled_pd_pose_model = pd.DataFrame()
-    model_rows_count = raw_pd_pose_model.shape[0]
-    for i in range(model_rows_count - 1):
-        if len(raw_pd_pose_model["pose_keypoints_2d"]) > 0:
-            modeled_pd_pose_model = modeled_pd_pose_model.append(
-                pd.DataFrame(raw_pd_pose_model["pose_keypoints_2d"][i]).T)
-
-    drop_confidence_columns(modeled_pd_pose_model)
-    modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
-    drop_zero_predominant_columns(modeled_pd_pose_model)
-
-    return modeled_pd_pose_model
-
-
-def interpolate_model(modeled_pd_pose_model):
+def __interpolate_model(modeled_pd_pose_model):
     modeled_pd_pose_model.replace(0, np.nan, inplace=True)
     modeled_pd_pose_model.interpolate(method='linear', limit_direction='forward', inplace=True)
 
 
-def find_side(modeled_pd_pose_model):
+def __find_side(modeled_pd_pose_model):
     left_ear_count = (modeled_pd_pose_model["left_ear_y"] != 0).sum()
     right_ear_count = (modeled_pd_pose_model["right_ear_y"] != 0).sum()
     if left_ear_count > right_ear_count:
@@ -266,23 +228,14 @@ def find_side(modeled_pd_pose_model):
         return RIGHT
 
 
-def find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
-    if exercise_type == PUSHUPS:
-        drop_specific_columns(modeled_pd_pose_model, PUSHUPS_COLUMNS_TO_DROP)
-    elif exercise_type == PULLUPS:
-        drop_specific_columns(modeled_pd_pose_model, PULLUPS_COLUMNS_TO_DROP)
-    else:
-        drop_specific_columns(modeled_pd_pose_model, EMPTY_COLUMNS_TO_DROP)
-
-
-def drop_specific_columns(modeled_pd_pose_model, columns_to_drop):
+def __drop_specific_columns(modeled_pd_pose_model, columns_to_drop):
     for column_to_drop in columns_to_drop:
         for column in modeled_pd_pose_model.columns:
             if column_to_drop in column:
                 modeled_pd_pose_model.drop(columns=[column], inplace=True)
 
 
-def drop_zero_predominant_columns(modeled_pd_pose_model):
+def __drop_zero_predominant_columns(modeled_pd_pose_model):
     rows_count = modeled_pd_pose_model.shape[0]
     columns_to_drop = []
     for column in modeled_pd_pose_model.columns:
@@ -296,43 +249,89 @@ def drop_zero_predominant_columns(modeled_pd_pose_model):
         modeled_pd_pose_model.drop(columns=[column + "_y"], inplace=True)
 
 
-def drop_confidence_columns(modeled_pd_pose_model):
+def __drop_confidence_columns(modeled_pd_pose_model):
     model_columns_count = modeled_pd_pose_model.shape[1]
     for i in range(2, model_columns_count, 3):
         modeled_pd_pose_model.drop(columns=[i], inplace=True)
 
 
-def model_prepare(file_name, save_model):
-    raw_pd_pose_model = create_pose_dataframe(file_name)
-    modeled_pd_pose_model = transform_model(raw_pd_pose_model)
-
-    side_detected = find_side(modeled_pd_pose_model)
-    interpolate_model(modeled_pd_pose_model)
-
-    dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
-    # TODO: at this point ML comes and detects the exercise. no need for exercise_type to be a parameter anymore
-
-    exercise_type = find_exercise_type(dataframe_for_ml)
-
-    find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
-    if save_model:
-        save_to_pickle(modeled_pd_pose_model, file_name)
-    return modeled_pd_pose_model, side_detected, exercise_type
-
-
-def find_exercise_type(dataframe_for_ml):
-    exercise_type = PUSHUPS
-    return exercise_type
-
-
-def save_to_pickle(modeled_pd_pose_model, file_name):
+def __save_to_pickle(modeled_pd_pose_model, file_name):
     modeled_pd_pose_model.to_pickle("./dataframes/" + file_name + ".pkl")
     print("model ", file_name, " saved to ", file_name + ".pkl")
 
 
-def load_from_pickle(file_name):
-    print("Loaded ", file_name)
-    return pd.read_pickle("./dataframes/" + file_name)
+def __find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type):
+    if exercise_type == PUSHUPS:
+        __drop_specific_columns(modeled_pd_pose_model, PUSHUPS_COLUMNS_TO_DROP)
+    elif exercise_type == PULLUPS:
+        __drop_specific_columns(modeled_pd_pose_model, PULLUPS_COLUMNS_TO_DROP)
+    else:
+        __drop_specific_columns(modeled_pd_pose_model, EMPTY_COLUMNS_TO_DROP)
+
+
+def __transform_model(raw_pd_pose_model):
+    modeled_pd_pose_model = pd.DataFrame()
+    model_rows_count = raw_pd_pose_model.shape[0]
+    for i in range(model_rows_count - 1):
+        if len(raw_pd_pose_model["pose_keypoints_2d"]) > 0:
+            modeled_pd_pose_model = modeled_pd_pose_model.append(
+                pd.DataFrame(raw_pd_pose_model["pose_keypoints_2d"][i]).T)
+
+    __drop_confidence_columns(modeled_pd_pose_model)
+    modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
+    __drop_zero_predominant_columns(modeled_pd_pose_model)
+
+    return modeled_pd_pose_model
+
+
+def __split_dataframe(dataframe):
+    dataframe_values = dataframe["nose_y"].values
+    dataframe_length = len(dataframe_values)
+    previous_value = dataframe_values[0]
+    starting_index = 0
+    graph_type = __get_graph_type(dataframe_values)
+    print("Found graph type: ", graph_type)
+    found_extreme = False
+    dataframes = []
+
+    for index, current_value in enumerate(dataframe_values):
+        if graph_type is ASCENDING:
+            # first if clause is checking if the values are still increasing. After that, we suppose that the values
+            # started decreasing
+            if found_extreme is False and (
+                    current_value >= previous_value or (dataframe_length > index + 1 and (
+                    current_value <= dataframe_values[index + 1]
+                    or __check_abs(current_value, dataframe_values[index + 1])))):
+                previous_value = current_value
+                continue
+
+            if dataframe_length > index + 1 and \
+                    (current_value > dataframe_values[index + 1]
+                     or __check_abs(current_value, dataframe_values[index + 1])):
+                found_extreme = True
+                previous_value = current_value
+            elif index + 1 is dataframe_length:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                break
+            else:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                starting_index = index
+                found_extreme = False
+                previous_value = current_value
+
+    return dataframes
+
+
+def __load_correct_model(side_detected):
+    print("Side detected: ", side_detected)
+    if side_detected is PULLUPS:
+        return load_from_pickle(PULLUPS + ".pkl"), PULLUPS
+    elif side_detected is LEFT:
+        return load_from_pickle(PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
+    elif side_detected is RIGHT:
+        return load_from_pickle(PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
 
 
 if __name__ == '__main__':
