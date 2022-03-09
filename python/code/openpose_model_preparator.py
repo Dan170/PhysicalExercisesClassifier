@@ -58,7 +58,7 @@ def main():
 
     plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
 
-    dataframes = __split_dataframe(dataframe)
+    dataframes = split_dataframe(dataframe)
     print("Found {} {}".format(len(dataframes), exercise_type))
 
     for index, split_df in enumerate(dataframes):
@@ -88,7 +88,7 @@ def model_prepare(file_name, save_model):
     side_detected = __find_side(modeled_pd_pose_model)
     __interpolate_model(modeled_pd_pose_model)
 
-    dataframe_for_ml = __split_dataframe(modeled_pd_pose_model)[0]
+    dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
     # TODO: at this point ML comes and detects the exercise. no need for exercise_type to be a parameter anymore
 
     exercise_type = find_exercise_type(dataframe_for_ml)
@@ -102,6 +102,46 @@ def model_prepare(file_name, save_model):
 def find_exercise_type(dataframe_for_ml):
     exercise_type = PUSHUPS
     return exercise_type
+
+
+def split_dataframe(dataframe):
+    dataframe_values = dataframe["nose_y"].values
+    dataframe_length = len(dataframe_values)
+    previous_value = dataframe_values[0]
+    starting_index = 0
+    graph_type = __get_graph_type(dataframe_values)
+    print("Found graph type: ", graph_type)
+    found_extreme = False
+    dataframes = []
+
+    for index, current_value in enumerate(dataframe_values):
+        if graph_type is ASCENDING:
+            # first if clause is checking if the values are still increasing. After that, we suppose that the values
+            # started decreasing
+            if found_extreme is False and (
+                    current_value >= previous_value or (dataframe_length > index + 1 and (
+                    current_value <= dataframe_values[index + 1]
+                    or __check_abs(current_value, dataframe_values[index + 1])))):
+                previous_value = current_value
+                continue
+
+            if dataframe_length > index + 1 and \
+                    (current_value > dataframe_values[index + 1]
+                     or __check_abs(current_value, dataframe_values[index + 1])):
+                found_extreme = True
+                previous_value = current_value
+            elif index + 1 is dataframe_length:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                break
+            else:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                starting_index = index
+                found_extreme = False
+                previous_value = current_value
+
+    return dataframes
 
 
 def plot_compare_dataframes(df1, df2, label1, label2):
@@ -282,46 +322,6 @@ def __transform_model(raw_pd_pose_model):
     __drop_zero_predominant_columns(modeled_pd_pose_model)
 
     return modeled_pd_pose_model
-
-
-def __split_dataframe(dataframe):
-    dataframe_values = dataframe["nose_y"].values
-    dataframe_length = len(dataframe_values)
-    previous_value = dataframe_values[0]
-    starting_index = 0
-    graph_type = __get_graph_type(dataframe_values)
-    print("Found graph type: ", graph_type)
-    found_extreme = False
-    dataframes = []
-
-    for index, current_value in enumerate(dataframe_values):
-        if graph_type is ASCENDING:
-            # first if clause is checking if the values are still increasing. After that, we suppose that the values
-            # started decreasing
-            if found_extreme is False and (
-                    current_value >= previous_value or (dataframe_length > index + 1 and (
-                    current_value <= dataframe_values[index + 1]
-                    or __check_abs(current_value, dataframe_values[index + 1])))):
-                previous_value = current_value
-                continue
-
-            if dataframe_length > index + 1 and \
-                    (current_value > dataframe_values[index + 1]
-                     or __check_abs(current_value, dataframe_values[index + 1])):
-                found_extreme = True
-                previous_value = current_value
-            elif index + 1 is dataframe_length:
-                split_df = dataframe.iloc[starting_index:index + 1, :]
-                dataframes.append(split_df)
-                break
-            else:
-                split_df = dataframe.iloc[starting_index:index + 1, :]
-                dataframes.append(split_df)
-                starting_index = index
-                found_extreme = False
-                previous_value = current_value
-
-    return dataframes
 
 
 def __load_correct_model(side_detected):
