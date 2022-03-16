@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 KEYPOINTS_JSON = '_keypoints.json'
-PATH = ".\\JSON_FILES\\"
+PATH = "JSON_FILES\\"
 
 MAX_ROWS = 5
 MAX_COLUMNS = 4
