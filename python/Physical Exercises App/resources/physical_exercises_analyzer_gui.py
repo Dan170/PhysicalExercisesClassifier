@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter.ttk import Style, Frame, Label, Radiobutton, Button
 
-from openpose_model_preparator import PUSHUPS, PULLUPS
+from resources.openpose_model_preparator import PUSHUPS, PULLUPS
 
 AUTO = "AUTO"
 MANUAL = "MANUAL"

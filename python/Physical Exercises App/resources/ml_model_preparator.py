@@ -1,7 +1,7 @@
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.impute import SimpleImputer
-from openpose_model_preparator import load_from_pickle, split_dataframe, PUSHUPS_FRONT, PUSHUPS_LEFT, PUSHUPS_RIGHT, \
-    MULTIPLE
+from resources.openpose_model_preparator import load_from_pickle, split_dataframe, PUSHUPS_FRONT, PUSHUPS_LEFT, \
+    PUSHUPS_RIGHT, MULTIPLE
 import numpy as np
 
 
