@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 KEYPOINTS_JSON = '_keypoints.json'
-PATH = r'C:\Users\Dani\Desktop\info\licenta\proiect\PhysicalExercisesClassifier\python'
+PATH = ".\\JSON_FILES\\"
 
 MAX_ROWS = 5
 MAX_COLUMNS = 4
@@ -189,7 +189,7 @@ def plot_dataframe(df, label):
 
 def load_from_pickle(file_name):
     print("Loaded ", file_name)
-    return pd.read_pickle("./dataframes/" + file_name)
+    return pd.read_pickle("./pickle_models/" + file_name)
 
 
 def __check_abs(value1, value2):
@@ -296,7 +296,7 @@ def __drop_confidence_columns(modeled_pd_pose_model):
 
 
 def __save_to_pickle(modeled_pd_pose_model, file_name):
-    modeled_pd_pose_model.to_pickle("./dataframes/" + file_name + ".pkl")
+    modeled_pd_pose_model.to_pickle("./pickle_models/" + file_name + ".pkl")
     print("model ", file_name, " saved to ", file_name + ".pkl")
 
 

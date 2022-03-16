@@ -1,4 +1,4 @@
-from physical_exercises_analyzer import ExercisesAnalyzerApp
+from resources.physical_exercises_analyzer import ExercisesAnalyzerApp
 
 
 def main():
