@@ -157,16 +157,15 @@ class ExercisesAnalyzerApp:
     def __run_openpose_script(self, file_path):
         filename = os.path.basename(file_path)
         filename_no_extension = filename.split(".")[0]
-        python_folder_path = os.getcwd()[:-len("/Physical Exercises App/src")]
+        python_folder_path = os.getcwd()[:-len("/Physical_Exercises_App/src")]
         openpose_python_path = python_folder_path + "/openpose_python.py"
         json_path = os.getcwd() + "/resources/JSON_FILES/" + filename_no_extension
         initial_directory = os.getcwd()
         os.chdir(python_folder_path)
 
-        command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json '{json_path}'"""
+        command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {json_path}"""
 
         os.system(command)
-
         os.chdir(initial_directory)
 
-        print
+        print("done")
