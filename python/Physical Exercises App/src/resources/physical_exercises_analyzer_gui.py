@@ -1,7 +1,8 @@
 import tkinter as tk
+from tkinter import filedialog as fd
 from tkinter.ttk import Style, Frame, Label, Radiobutton, Button
-
 from resources.openpose_model_preparator import PUSHUPS, PULLUPS
+import os
 
 AUTO = "AUTO"
 MANUAL = "MANUAL"
@@ -95,16 +96,18 @@ class ExercisesAnalyzerApp:
         self.open_file_label = Label(self.right_frame, text="Upload exercise video:")
         self.open_file_label.grid(row=0, column=0, padx=15, pady=(25, 15))
 
-        self.open_file_button = Button(self.right_frame, text="Load Video")
+        self.open_file_button = Button(self.right_frame, text="Load Video", command=self.__load_video)
         self.open_file_button.grid(row=1, column=0, padx=15, pady=10)
 
         self.download_results_label = Label(self.right_frame, text="Download results:")
         self.download_results_label.grid(row=2, column=0, padx=15, pady=(40, 10))
 
-        self.download_txt_result = Button(self.right_frame, text="Download .txt result")
+        self.download_txt_result = Button(self.right_frame, text="Download .txt result", state=DISABLED,
+                                          command=self.__save_txt_result)
         self.download_txt_result.grid(row=3, column=0, padx=15, pady=10)
 
-        self.download_video_result = Button(self.right_frame, text="Download video result")
+        self.download_video_result = Button(self.right_frame, text="Download video result", state=DISABLED,
+                                            command=self.__save_video_result)
         self.download_video_result.grid(row=4, column=0, padx=15, pady=10)
 
         self.status_label = Label(self.right_frame, text="Status:", font=H2_FONT_BOLD)
@@ -131,3 +134,39 @@ class ExercisesAnalyzerApp:
     def __pack_frames(self):
         self.left_frame.pack(side=tk.LEFT, fill="both")
         self.right_frame.pack(side=tk.RIGHT, fill="both")
+
+    def __save_txt_result(self):
+        pass
+
+    def __save_video_result(self):
+        pass
+
+    def __load_video(self):
+        file_types = (
+            ('MP4 File', '*.mp4'),
+            ('AVI File', '*.avi')
+        )
+
+        file_path = fd.askopenfilename(
+            title='Open a file',
+            initialdir='./',
+            filetypes=file_types)
+
+        self.__run_openpose_script(file_path)
+
+    def __run_openpose_script(self, file_path):
+        filename = os.path.basename(file_path)
+        filename_no_extension = filename.split(".")[0]
+        python_folder_path = os.getcwd()[:-len("/Physical Exercises App/src")]
+        openpose_python_path = python_folder_path + "/openpose_python.py"
+        json_path = os.getcwd() + "/resources/JSON_FILES/" + filename_no_extension
+        initial_directory = os.getcwd()
+        os.chdir(python_folder_path)
+
+        command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json '{json_path}'"""
+
+        os.system(command)
+
+        os.chdir(initial_directory)
+
+        print
