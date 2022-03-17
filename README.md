@@ -2,8 +2,10 @@
 
 How to run:
 
-`python .\openpose_python.py --model_pose COCO --net_resolution "320x176" --face_net_resolution "320x320" --part_candidates --write_json`
+`python {openpose_python.py_path} --model_pose COCO --video {video_path} --net_resolution "-1x176" --face_net_resolution "320x320" --number_people_max 1 --write_json {json_folder_path}`
 
-`python .\openpose_python.py --model_pose COCO --video "./examples/media/bad_pushups_example.mp4" --net_resolution "320x176" --face_net_resolution "320x320" --keypoint_scale 3 --number_people_max 1 --write_json "/bad"`
+With no display output:
 
-`python .\openpose_python.py --model_pose COCO --video "./examples/media/PUSHUPS_RIGHT_BAD.mp4" --net_resolution "320x176" --face_net_resolution "320x320" --number_people_max 1 --write_json "./PUSHUPS_RIGHT_BAD" --write_video "./examples/openpose/PUSHUPS_RIGHT_OPENPOSE_BAD.avi"`
+`python {openpose_python.py_path} --model_pose COCO --display 0 --render_pose 0 --video {video_path} --net_resolution "-1x176" --face_net_resolution "320x320" --number_people_max 1 --write_json {json_folder_path} --write_video {output_video_path}`
+
+Check [OpenPose Flags Doc](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/include/openpose/flags.hpp) for more info on run commands
