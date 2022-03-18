@@ -113,13 +113,21 @@ class ExercisesAnalyzerApp:
         self.status_label = Label(self.right_frame, text="Status:", font=H2_FONT_BOLD)
         self.status_label.grid(row=5, column=0, padx=15, pady=(40, 10), sticky="w")
 
-        self.status = Label(self.right_frame, text="Waiting for input", font=H2_FONT_BOLD, foreground=GREEN,
+        self.status = Label(self.right_frame, text="Waiting for input", font=H2_FONT_BOLD, foreground=BLACK,
                             background=WHITE, padding=5, relief="solid")
         self.status.grid(row=6, column=0, padx=15, sticky="w")
 
         self.credits_label = Label(self.right_frame, text="Physical Exercises Analyzer\nMade By Daniel Popescu",
                                    font=H2_FONT, background=LIGHT_BLUE)
         self.credits_label.grid(row=10, column=0, columnspan=2, padx=15, pady=(155, 10), sticky="se")
+
+    def __modify_status(self, new_status=None, new_color=None):
+        if new_status is None:
+            new_status = self.status["text"]
+        if new_color is None:
+            new_color = self.status["background"]
+
+        self.status.configure(text=new_status, background=new_color)
 
     def __check_detection_button(self):
         if self.detection_button_variable.get() == AUTO:
@@ -142,6 +150,7 @@ class ExercisesAnalyzerApp:
         pass
 
     def __load_video(self):
+        self.__modify_status("Loading video", YELLOW)
         file_types = (
             ('MP4 File', '*.mp4'),
             ('AVI File', '*.avi')
@@ -151,6 +160,8 @@ class ExercisesAnalyzerApp:
             title='Open a file',
             initialdir='./',
             filetypes=file_types)
+
+        self.__modify_status("Analyzing video")
 
         self.__run_openpose_script(file_path)
 
