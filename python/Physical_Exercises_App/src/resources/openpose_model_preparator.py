@@ -6,6 +6,8 @@ import numpy as np
 from dtw import dtw
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from resources.constants import PUSHUPS_FRONT, MULTIPLE, PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, \
+    PUSHUPS_LEFT, PUSHUPS_RIGHT
 
 KEYPOINTS_JSON = '_keypoints.json'
 PATH = "JSON_FILES\\"
@@ -14,22 +16,6 @@ MAX_ROWS = 5
 MAX_COLUMNS = 4
 MAX_WIDTH = 1500
 MAX_HEIGHT = 1200
-
-PUSHUPS = "PUSHUPS"
-PULLUPS = "PULLUPS"
-
-FRONT = "_FRONT"
-RIGHT = "_RIGHT"
-LEFT = "_LEFT"
-MULTIPLE = "_MULTIPLE"
-BAD = "_BAD"
-
-ASCENDING = "ASCENDING"
-DESCENDING = "DESCENDING"
-
-PUSHUPS_LEFT = PUSHUPS + LEFT
-PUSHUPS_RIGHT = PUSHUPS + RIGHT
-PUSHUPS_FRONT = PUSHUPS + FRONT
 
 PUSHUPS_COLUMNS_TO_DROP = ['wrist', 'elbow', 'ankle']
 PULLUPS_COLUMNS_TO_DROP = ['wrist', 'elbow']
@@ -81,7 +67,7 @@ def evaluate_dataframe(dataframe, correct_dataframe):
         print("Wrong exercise")
 
 
-def model_prepare(file_name, save_model):
+def model_prepare(file_name, save_model=False):
     raw_pd_pose_model = __create_pose_dataframe(file_name)
     modeled_pd_pose_model = __transform_model(raw_pd_pose_model)
 

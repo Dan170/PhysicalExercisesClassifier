@@ -1,11 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog as fd
-from tkinter.ttk import Style, Frame, Label, Radiobutton, Button
-from resources.openpose_model_preparator import PUSHUPS, PULLUPS
+from tkinter.ttk import Style, Frame, Label, Radiobutton, Button, Checkbutton
+from resources.constants import PUSHUPS, PULLUPS, MANUAL, AUTO, TRUE, FALSE
+from resources.evaluation_options import EvaluationOptions
 import os
 
-AUTO = "AUTO"
-MANUAL = "MANUAL"
 DISABLED = tk.DISABLED
 NORMAL = tk.NORMAL
 
@@ -23,18 +22,27 @@ LIGHT_BLUE = "#c0f4fc"
 
 class ExercisesAnalyzerApp:
     def __init__(self):
+        self.__initialize_misc()
+
         self.__initialize_master()
         self.__initialize_styles()
 
         self.__initialize_left_frame()
         self.__initialize_right_frame()
-
         self.__pack_frames()
+
         self.master.mainloop()
+
+    def __initialize_misc(self):
+        self.json_path = ""
+        self.filename_no_extension = ""
 
     def __initialize_styles(self):
         self.radio_button_style = Style()
         self.radio_button_style.configure("TRadiobutton", font=H2_FONT, background=LIGHT_BLUE)
+
+        self.check_button_style = Style()
+        self.check_button_style.configure("TCheckbutton", font=H2_FONT, background=LIGHT_BLUE)
 
         self.button_style = Style()
         self.button_style.configure("TButton", font=H2_FONT_BOLD)
@@ -99,27 +107,33 @@ class ExercisesAnalyzerApp:
         self.open_file_button = Button(self.right_frame, text="Load Video", command=self.__load_video)
         self.open_file_button.grid(row=1, column=0, padx=15, pady=10)
 
+        self.show_graphs_checkbutton_variable = tk.StringVar(self.right_frame, TRUE)
+        self.show_graphs_checkbutton = Checkbutton(self.right_frame, text="Show Graphs",
+                                                   variable=self.show_graphs_checkbutton_variable, onvalue=TRUE,
+                                                   offvalue=FALSE)
+        self.show_graphs_checkbutton.grid(row=2, column=0, columnspan=2, padx=15, pady=10, sticky="w")
+
         self.download_results_label = Label(self.right_frame, text="Download results:")
-        self.download_results_label.grid(row=2, column=0, padx=15, pady=(40, 10))
+        self.download_results_label.grid(row=3, column=0, padx=15, pady=(40, 10))
 
         self.download_txt_result = Button(self.right_frame, text="Download .txt result", state=DISABLED,
                                           command=self.__save_txt_result)
-        self.download_txt_result.grid(row=3, column=0, padx=15, pady=10)
+        self.download_txt_result.grid(row=4, column=0, padx=15, pady=10)
 
         self.download_video_result = Button(self.right_frame, text="Download video result", state=DISABLED,
                                             command=self.__save_video_result)
-        self.download_video_result.grid(row=4, column=0, padx=15, pady=10)
+        self.download_video_result.grid(row=5, column=0, padx=15, pady=10)
 
         self.status_label = Label(self.right_frame, text="Status:", font=H2_FONT_BOLD)
-        self.status_label.grid(row=5, column=0, padx=15, pady=(40, 10), sticky="w")
+        self.status_label.grid(row=6, column=0, padx=15, pady=(40, 10), sticky="w")
 
         self.status = Label(self.right_frame, text="Waiting for input", font=H2_FONT_BOLD, foreground=BLACK,
                             background=WHITE, padding=5, relief="solid")
-        self.status.grid(row=6, column=0, padx=15, sticky="w")
+        self.status.grid(row=7, column=0, padx=15, sticky="w")
 
         self.credits_label = Label(self.right_frame, text="Physical Exercises Analyzer\nMade By Daniel Popescu",
                                    font=H2_FONT, background=LIGHT_BLUE)
-        self.credits_label.grid(row=10, column=0, columnspan=2, padx=15, pady=(155, 10), sticky="se")
+        self.credits_label.grid(row=10, column=0, columnspan=2, padx=15, pady=(120, 10), sticky="se")
 
     def __modify_status(self, new_status=None, new_color=None):
         if new_status is None:
@@ -163,20 +177,40 @@ class ExercisesAnalyzerApp:
 
         self.__modify_status("Analyzing video")
 
-        self.__run_openpose_script(file_path)
+        self.__generate_json_files(file_path)
+        self.__create_evaluate_options(file_path)
+        print
 
-    def __run_openpose_script(self, file_path):
+    def __create_evaluate_options(self, file_path):
+        self.evaluation_options = EvaluationOptions()
+        self.evaluation_options.filename = self.filename_no_extension
+        self.evaluation_options.folder_path = self.json_path
+        self.evaluation_options.fps = self.__get_video_fps(file_path)
+        self.evaluation_options.show_graphs = self.show_graphs_checkbutton_variable.get()
+        self.evaluation_options.detection_type = self.detection_button_variable.get()
+        if self.evaluation_options.detection_type == AUTO:
+            self.evaluation_options.exercise_type = AUTO
+        else:
+            self.evaluation_options.exercise_type = self.exercise_type_variable.get()
+
+    def __generate_json_files(self, file_path):
         filename = os.path.basename(file_path)
-        filename_no_extension = filename.split(".")[0]
+        self.filename_no_extension = filename.split(".")[0]
         python_folder_path = os.getcwd()[:-len("/Physical_Exercises_App/src")]
         openpose_python_path = python_folder_path + "/openpose_python.py"
-        json_path = os.getcwd() + "/resources/JSON_FILES/" + filename_no_extension
+        self.json_path = os.getcwd() + "/resources/JSON_FILES/" + self.filename_no_extension
         initial_directory = os.getcwd()
         os.chdir(python_folder_path)
 
-        command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {json_path}"""
+        command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {self.json_path}"""
 
         os.system(command)
         os.chdir(initial_directory)
 
-        print("done")
+        print("Saved JSON Files to ", self.json_path)
+
+    def __get_video_fps(self, file_path):
+        import cv2
+        video = cv2.VideoCapture(file_path)
+
+        return video.get(cv2.CAP_PROP_FPS)
