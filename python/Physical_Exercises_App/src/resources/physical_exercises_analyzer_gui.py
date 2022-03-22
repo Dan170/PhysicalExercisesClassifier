@@ -5,6 +5,8 @@ from resources.constants import PUSHUPS, PULLUPS, MANUAL, AUTO, TRUE, FALSE
 from resources.evaluation_options import EvaluationOptions
 import os
 
+from resources.openpose_model_preparator import analyze_model
+
 DISABLED = tk.DISABLED
 NORMAL = tk.NORMAL
 
@@ -179,12 +181,15 @@ class ExercisesAnalyzerApp:
 
         self.__generate_json_files(file_path)
         self.__create_evaluate_options(file_path)
+
+        analyze_model(self.evaluation_options)
         print
 
     def __create_evaluate_options(self, file_path):
         self.evaluation_options = EvaluationOptions()
         self.evaluation_options.filename = self.filename_no_extension
         self.evaluation_options.folder_path = self.json_path
+        self.evaluation_options.python_folder_path = self.python_folder_path
         self.evaluation_options.fps = self.__get_video_fps(file_path)
         self.evaluation_options.show_graphs = self.show_graphs_checkbutton_variable.get()
         self.evaluation_options.detection_type = self.detection_button_variable.get()
@@ -196,11 +201,11 @@ class ExercisesAnalyzerApp:
     def __generate_json_files(self, file_path):
         filename = os.path.basename(file_path)
         self.filename_no_extension = filename.split(".")[0]
-        python_folder_path = os.getcwd()[:-len("/Physical_Exercises_App/src")]
-        openpose_python_path = python_folder_path + "/openpose_python.py"
+        self.python_folder_path = os.getcwd()[:-len("/Physical_Exercises_App/src")]
+        openpose_python_path = self.python_folder_path + "/openpose_python.py"
         self.json_path = os.getcwd() + "/resources/JSON_FILES/" + self.filename_no_extension
         initial_directory = os.getcwd()
-        os.chdir(python_folder_path)
+        os.chdir(self.python_folder_path)
 
         command = f"""python {openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {self.json_path}"""
 

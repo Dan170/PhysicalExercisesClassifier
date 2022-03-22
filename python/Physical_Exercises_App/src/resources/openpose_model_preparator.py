@@ -5,9 +5,11 @@ import os
 import numpy as np
 from dtw import dtw
 import plotly.graph_objects as go
+import plotly
+import plotly.io as pio
 from plotly.subplots import make_subplots
 from resources.constants import PUSHUPS_FRONT, MULTIPLE, PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, \
-    PUSHUPS_LEFT, PUSHUPS_RIGHT
+    PUSHUPS_LEFT, PUSHUPS_RIGHT, AUTO, TRUE
 
 KEYPOINTS_JSON = '_keypoints.json'
 PATH = "JSON_FILES\\"
@@ -54,6 +56,30 @@ def main():
         evaluate_dataframe(split_df, correct_dataframe)
 
 
+def analyze_model(evaluation_options):
+    dataframe, side_detected, exercise_type = model_prepare(evaluation_options)
+
+    if exercise_type is PULLUPS:
+        side_detected = PULLUPS
+    pickle_models_path = evaluation_options.python_folder_path + "/Physical_Exercises_App/src/resources/pickle_models/"
+    correct_dataframe, correct_file_name = __load_correct_model(pickle_models_path, side_detected)
+
+    if evaluation_options.show_graphs is TRUE:
+        plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT",
+                                evaluation_options.filename)
+
+    dataframes = split_dataframe(dataframe)
+    print("Found {} {}".format(len(dataframes), exercise_type))
+
+    for index, split_df in enumerate(dataframes):
+        print("||||||||||||  For {} number {}".format(exercise_type, index))
+        # plot_dataframe(split_dataframe, file_name + str(index))
+        if evaluation_options.show_graphs is TRUE:
+            plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
+                                    evaluation_options.filename + str(index))
+        evaluate_dataframe(split_df, correct_dataframe)
+
+
 def evaluate_dataframe(dataframe, correct_dataframe):
     evaluated_dataframe = __evaluate_dtw_columns(dataframe, correct_dataframe)
 
@@ -67,19 +93,26 @@ def evaluate_dataframe(dataframe, correct_dataframe):
         print("Wrong exercise")
 
 
-def model_prepare(file_name, save_model=False):
-    raw_pd_pose_model = __create_pose_dataframe(file_name)
+def model_prepare(options, save_model=False):
+    folder_path = options.folder_path
+    file_name = options.filename
+    detection_type = options.detection_type
+
+    raw_pd_pose_model = __create_pose_dataframe(folder_path, file_name)
     modeled_pd_pose_model = __transform_model(raw_pd_pose_model)
 
     side_detected = __find_side(modeled_pd_pose_model)
     __interpolate_model(modeled_pd_pose_model)
 
     dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
-    # TODO: at this point ML comes and detects the exercise. no need for exercise_type to be a parameter anymore
 
-    exercise_type = find_exercise_type(dataframe_for_ml)
+    if detection_type is AUTO:
+        exercise_type = find_exercise_type(dataframe_for_ml)
+    else:
+        exercise_type = options.exercise_type
 
     __find_exercise_type_drop_columns(modeled_pd_pose_model, exercise_type)
+
     if save_model:
         __save_to_pickle(modeled_pd_pose_model, file_name)
     return modeled_pd_pose_model, side_detected, exercise_type
@@ -173,9 +206,9 @@ def plot_dataframe(df, label):
     figure.show()
 
 
-def load_from_pickle(file_name):
-    print("Loaded ", file_name)
-    return pd.read_pickle("./pickle_models/" + file_name)
+def load_from_pickle(file_path):
+    print("Loaded ", file_path)
+    return pd.read_pickle(file_path)
 
 
 def __check_abs(value1, value2):
@@ -215,8 +248,7 @@ def __read_json_file(file_path):
         return json_data["people"][0]
 
 
-def __create_pose_dataframe(file_name):
-    folder_path = PATH + '\\' + file_name
+def __create_pose_dataframe(folder_path, file_name):
     try:
         _, _, files = next(os.walk(folder_path))
         dataframe = pd.DataFrame()
@@ -310,14 +342,14 @@ def __transform_model(raw_pd_pose_model):
     return modeled_pd_pose_model
 
 
-def __load_correct_model(side_detected):
+def __load_correct_model(path, side_detected):
     print("Side detected: ", side_detected)
     if side_detected is PULLUPS:
-        return load_from_pickle(PULLUPS + ".pkl"), PULLUPS
+        return load_from_pickle(path + PULLUPS + ".pkl"), PULLUPS
     elif side_detected is LEFT:
-        return load_from_pickle(PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
+        return load_from_pickle(path + PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
     elif side_detected is RIGHT:
-        return load_from_pickle(PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
+        return load_from_pickle(path + PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
 
 
 if __name__ == '__main__':
