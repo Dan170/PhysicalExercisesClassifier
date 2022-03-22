@@ -5,11 +5,9 @@ import os
 import numpy as np
 from dtw import dtw
 import plotly.graph_objects as go
-import plotly
-import plotly.io as pio
 from plotly.subplots import make_subplots
-from resources.constants import PUSHUPS_FRONT, MULTIPLE, PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, \
-    PUSHUPS_LEFT, PUSHUPS_RIGHT, AUTO, TRUE
+from resources.constants import PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, PUSHUPS_LEFT, PUSHUPS_RIGHT, \
+    AUTO, TRUE
 
 KEYPOINTS_JSON = '_keypoints.json'
 PATH = "JSON_FILES\\"
@@ -37,25 +35,6 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
                       'background_y']
 
 
-def main():
-    file_name = PUSHUPS_FRONT + MULTIPLE
-    save_model_to_pickle = False
-
-    dataframe, side_detected, exercise_type = model_prepare(file_name, save_model_to_pickle)
-    correct_dataframe, correct_file_name = __load_correct_model(side_detected)
-
-    plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT", file_name)
-
-    dataframes = split_dataframe(dataframe)
-    print("Found {} {}".format(len(dataframes), exercise_type))
-
-    for index, split_df in enumerate(dataframes):
-        print("||||||||||||  For {} number {}".format(exercise_type, index))
-        # plot_dataframe(split_dataframe, file_name + str(index))
-        plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT", file_name + str(index))
-        evaluate_dataframe(split_df, correct_dataframe)
-
-
 def analyze_model(evaluation_options):
     dataframe, side_detected, exercise_type = model_prepare(evaluation_options)
 
@@ -64,7 +43,7 @@ def analyze_model(evaluation_options):
     pickle_models_path = evaluation_options.python_folder_path + "/Physical_Exercises_App/src/resources/pickle_models/"
     correct_dataframe, correct_file_name = __load_correct_model(pickle_models_path, side_detected)
 
-    if evaluation_options.show_graphs is TRUE:
+    if evaluation_options.show_graphs == TRUE:
         plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT",
                                 evaluation_options.filename)
 
@@ -72,12 +51,15 @@ def analyze_model(evaluation_options):
     print("Found {} {}".format(len(dataframes), exercise_type))
 
     for index, split_df in enumerate(dataframes):
-        print("||||||||||||  For {} number {}".format(exercise_type, index))
-        # plot_dataframe(split_dataframe, file_name + str(index))
-        if evaluation_options.show_graphs is TRUE:
+        print("||||||||||||  For {} number {}".format(exercise_type, index + 1))
+
+        if evaluation_options.show_graphs == TRUE:
             plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
-                                    evaluation_options.filename + str(index))
+                                    evaluation_options.filename + str(index + 1))
         evaluate_dataframe(split_df, correct_dataframe)
+
+        exec_time = split_df.shape[0] / evaluation_options.fps
+        print("Execution time: {:.2f} seconds".format(exec_time))
 
 
 def evaluate_dataframe(dataframe, correct_dataframe):
@@ -182,7 +164,10 @@ def plot_compare_dataframes(df1, df2, label1, label2):
             else:
                 current_column = 1
                 current_row = current_row + 1
-    figure.update_layout(title_text=label1 + " vs " + label2, width=MAX_WIDTH, height=MAX_HEIGHT, hovermode="x")
+
+    title = label1 + " vs " + label2
+    figure.update_layout(title_text=title, width=MAX_WIDTH, height=MAX_HEIGHT, hovermode="x")
+
     figure.show()
 
 
@@ -350,7 +335,3 @@ def __load_correct_model(path, side_detected):
         return load_from_pickle(path + PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
     elif side_detected is RIGHT:
         return load_from_pickle(path + PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
-
-
-if __name__ == '__main__':
-    main()
