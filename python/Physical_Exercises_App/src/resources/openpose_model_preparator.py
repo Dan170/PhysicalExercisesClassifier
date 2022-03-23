@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from resources.constants import PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, PUSHUPS_LEFT, PUSHUPS_RIGHT, \
     AUTO, TRUE
+from resources.evaluation_options import EvaluationOptions
 
 KEYPOINTS_JSON = '_keypoints.json'
 PATH = "JSON_FILES\\"
@@ -41,39 +42,39 @@ def analyze_model(evaluation_options):
     if exercise_type is PULLUPS:
         side_detected = PULLUPS
     pickle_models_path = evaluation_options.python_folder_path + "/Physical_Exercises_App/src/resources/pickle_models/"
-    correct_dataframe, correct_file_name = __load_correct_model(pickle_models_path, side_detected)
+    correct_dataframe, correct_file_name = __load_correct_model(pickle_models_path, side_detected, evaluation_options)
 
     if evaluation_options.show_graphs == TRUE:
         plot_compare_dataframes(correct_dataframe, dataframe, correct_file_name + "_CORRECT",
                                 evaluation_options.filename)
 
     dataframes = split_dataframe(dataframe)
-    print("Found {} {}".format(len(dataframes), exercise_type))
+    __update_result_text(evaluation_options, f"Found {len(dataframes)} {exercise_type}")
 
     for index, split_df in enumerate(dataframes):
-        print("||||||||||||  For {} number {}".format(exercise_type, index + 1))
+        __update_result_text(evaluation_options, f"||||||||||||  For {exercise_type} number {index + 1}")
 
         if evaluation_options.show_graphs == TRUE and len(dataframes) > 1:
             plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
                                     evaluation_options.filename + str(index + 1))
-        evaluate_dataframe(split_df, correct_dataframe)
+        evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
 
         if evaluation_options.fps != 0:
             exec_time = split_df.shape[0] / evaluation_options.fps
-            print("Execution time: {:.2f} seconds".format(exec_time))
+            __update_result_text(evaluation_options, "Execution time: {:.2f} seconds".format(exec_time))
 
 
-def evaluate_dataframe(dataframe, correct_dataframe):
+def evaluate_dataframe(dataframe, correct_dataframe, evaluation_options=EvaluationOptions()):
     evaluated_dataframe = __evaluate_dtw_columns(dataframe, correct_dataframe)
 
     median_value = round(evaluated_dataframe.median()[0])
-    print("median: ", median_value)
+    __update_result_text(evaluation_options, f"Repetition threshold: {median_value}")
     if median_value < 25:
-        print("Exercise is ok")
+        __update_result_text(evaluation_options, "Exercise is ok")
     elif median_value < 35:
-        print("Exercise is incomplete")
+        __update_result_text(evaluation_options, "Exercise is incomplete")
     else:
-        print("Wrong exercise")
+        __update_result_text(evaluation_options, "Wrong exercise")
 
 
 def model_prepare(options, save_model=False):
@@ -85,7 +86,7 @@ def model_prepare(options, save_model=False):
     modeled_pd_pose_model, side_detected = __transform_model(raw_pd_pose_model)
     __interpolate_model(modeled_pd_pose_model)
 
-    dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
+    dataframe_for_ml = split_dataframe(modeled_pd_pose_model, options)[0]
 
     if detection_type is AUTO:
         exercise_type = find_exercise_type(dataframe_for_ml)
@@ -104,13 +105,13 @@ def find_exercise_type(dataframe_for_ml):
     return exercise_type
 
 
-def split_dataframe(dataframe):
+def split_dataframe(dataframe, options=EvaluationOptions()):
     dataframe_values = dataframe["nose_y"].values
     dataframe_length = len(dataframe_values)
     previous_value = dataframe_values[0]
     starting_index = 0
     graph_type = __get_graph_type(dataframe_values)
-    print("Found graph type: ", graph_type)
+    __update_result_text(options, f"Found graph type: {graph_type}")
     found_extreme = False
     dataframes = []
 
@@ -190,9 +191,14 @@ def plot_dataframe(df, label):
     figure.show()
 
 
-def load_from_pickle(file_path):
-    print("Loaded ", file_path)
+def load_from_pickle(file_path="", evaluation_options=EvaluationOptions()):
+    __update_result_text(evaluation_options, f"Loaded {file_path}")
     return pd.read_pickle(file_path)
+
+
+def __update_result_text(evaluation_options, text):
+    evaluation_options.result_text = evaluation_options.result_text + text + "\n\n"
+    print(text)
 
 
 def __check_abs(value1, value2):
@@ -327,11 +333,11 @@ def __transform_model(raw_pd_pose_model):
     return modeled_pd_pose_model, side_detected
 
 
-def __load_correct_model(path, side_detected):
-    print("Side detected: ", side_detected)
+def __load_correct_model(path, side_detected, evaluation_options):
+    __update_result_text(evaluation_options, f"Side detected: {side_detected}")
     if side_detected is PULLUPS:
-        return load_from_pickle(path + PULLUPS + ".pkl"), PULLUPS
+        return load_from_pickle(path + PULLUPS + ".pkl", evaluation_options), PULLUPS
     elif side_detected is LEFT:
-        return load_from_pickle(path + PUSHUPS_LEFT + ".pkl"), PUSHUPS_LEFT
+        return load_from_pickle(path + PUSHUPS_LEFT + ".pkl", evaluation_options), PUSHUPS_LEFT
     elif side_detected is RIGHT:
-        return load_from_pickle(path + PUSHUPS_RIGHT + ".pkl"), PUSHUPS_RIGHT
+        return load_from_pickle(path + PUSHUPS_RIGHT + ".pkl", evaluation_options), PUSHUPS_RIGHT

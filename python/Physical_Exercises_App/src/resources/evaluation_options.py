@@ -3,7 +3,7 @@ from resources.constants import TRUE, MANUAL, PUSHUPS
 
 class EvaluationOptions:
     def __init__(self, filename="", folder_path="", python_folder_path="", fps=0, show_graphs=TRUE,
-                 detection_type=MANUAL, exercise_type=PUSHUPS):
+                 detection_type=MANUAL, exercise_type=PUSHUPS, result_text=""):
         self.filename = filename
         self.folder_path = folder_path
         self.python_folder_path = python_folder_path
@@ -11,3 +11,4 @@ class EvaluationOptions:
         self.show_graphs = show_graphs
         self.detection_type = detection_type
         self.exercise_type = exercise_type
+        self.result_text = result_text

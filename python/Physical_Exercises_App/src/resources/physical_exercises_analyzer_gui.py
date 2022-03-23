@@ -37,6 +37,7 @@ class ExercisesAnalyzerApp:
         self.master.mainloop()
 
     def __initialize_misc(self):
+        self.evaluation_options = EvaluationOptions()
         self.json_path = ""
         self.filename_no_extension = ""
         self.python_folder_path = os.getcwd()[:-len("/Physical_Exercises_App/src")]
@@ -195,20 +196,23 @@ class ExercisesAnalyzerApp:
         if json_path != "":
             start_time = time.clock()
 
+            self.__clear_result_text()
+            self.__update_result_text("Folder loaded: " + json_path)
             self.download_txt_result.configure(state=DISABLED)
             self.download_video_result.configure(state=DISABLED)
 
             self.__modify_status("Analyzing JSON", YELLOW)
             self.json_path = json_path
             self.__get_file_name(json_path)
-            self.__create_evaluate_options()
+            self.__populate_evaluate_options()
 
             analyze_model(self.evaluation_options)
+            self.__update_result_text(self.evaluation_options.result_text)
 
             self.__modify_status("JSON analyzed", GREEN)
             self.download_txt_result.configure(state=NORMAL)
 
-            print(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
     def __get_file_name(self, folder_path):
         _, _, files = next(os.walk(folder_path))
@@ -231,23 +235,25 @@ class ExercisesAnalyzerApp:
         if file_path != "":
             start_time = time.clock()
 
+            self.__clear_result_text()
+            self.__update_result_text("File loaded: " + file_path)
             self.download_txt_result.configure(state=DISABLED)
             self.download_video_result.configure(state=DISABLED)
 
             self.__modify_status("Analyzing video", YELLOW)
             self.__generate_json_files(file_path)
-            self.__create_evaluate_options(file_path)
+            self.__populate_evaluate_options(file_path)
 
             analyze_model(self.evaluation_options)
+            self.__update_result_text(self.evaluation_options.result_text)
 
             self.__modify_status("Video analyzed", GREEN)
             self.download_txt_result.configure(state=NORMAL)
             self.download_video_result.configure(state=NORMAL)
 
-            print(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
-    def __create_evaluate_options(self, file_path=""):
-        self.evaluation_options = EvaluationOptions()
+    def __populate_evaluate_options(self, file_path=""):
         self.evaluation_options.filename = self.filename_no_extension
         self.evaluation_options.folder_path = self.json_path
         self.evaluation_options.python_folder_path = self.python_folder_path
@@ -268,11 +274,28 @@ class ExercisesAnalyzerApp:
         os.chdir(self.python_folder_path)
 
         command = f"""python {self.openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {self.json_path}"""
+        self.__update_result_text("Command executed:\n" + command)
 
         os.system(command)
         os.chdir(initial_directory)
 
-        print("Saved JSON Files to ", self.json_path)
+        self.__update_result_text(f"Saved JSON files to {self.json_path}")
+
+    def __update_result_text(self, text=""):
+        self.result_text_box.configure(state=NORMAL)
+        self.result_text_box.insert(tk.END, text + "\n\n")
+        self.result_text_box.update()
+        self.result_text_box.configure(state=DISABLED)
+
+        print(text)
+
+    def __clear_result_text(self):
+        self.result_text_box.configure(state=NORMAL)
+        self.result_text_box.delete("1.0", tk.END)
+        self.result_text_box.update()
+        self.result_text_box.configure(state=DISABLED)
+
+        self.evaluation_options.result_text = ""
 
     def __get_video_fps(self, file_path):
         import cv2
