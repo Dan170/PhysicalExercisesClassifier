@@ -109,13 +109,14 @@ class ExercisesAnalyzerApp:
         self.open_file_label = Label(self.right_frame, text="Upload exercise")
         self.open_file_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(25, 15))
 
-        self.open_file_button = Button(self.right_frame, text="Load video", command=self.__load_video)
-        self.open_file_button.grid(row=1, column=0, padx=(10, 5), pady=10)
+        self.open_file_button = Button(self.right_frame, text="Load video", command=self.__load_video, padding=3)
+        self.open_file_button.grid(row=1, column=0, padx=(5, 5), pady=10)
 
-        self.open_json_button = Button(self.right_frame, text="Load JSON folder", command=self.__load_json_folder)
+        self.open_json_button = Button(self.right_frame, text="Load JSON folder", command=self.__load_json_folder,
+                                       padding=3)
         self.open_json_button.grid(row=1, column=1, padx=(5, 10), pady=10)
 
-        self.show_graphs_checkbutton_variable = tk.StringVar(self.right_frame, TRUE)
+        self.show_graphs_checkbutton_variable = tk.StringVar(self.right_frame, FALSE)
         self.show_graphs_checkbutton = Checkbutton(self.right_frame, text="Show graphs",
                                                    variable=self.show_graphs_checkbutton_variable, onvalue=TRUE,
                                                    offvalue=FALSE)
@@ -125,11 +126,11 @@ class ExercisesAnalyzerApp:
         self.download_results_label.grid(row=3, column=0, columnspan=2, padx=10, pady=(40, 10))
 
         self.download_txt_result = Button(self.right_frame, text="Download .txt result", state=DISABLED,
-                                          command=self.__save_txt_result)
+                                          command=self.__save_txt_result, padding=3)
         self.download_txt_result.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
 
         self.download_video_result = Button(self.right_frame, text="Download video result", state=DISABLED,
-                                            command=self.__save_video_result)
+                                            command=self.__save_video_result, padding=3)
         self.download_video_result.grid(row=5, column=0, columnspan=2, padx=10, pady=10)
 
         self.status_label = Label(self.right_frame, text="Status", font=H2_FONT_BOLD)
@@ -141,7 +142,7 @@ class ExercisesAnalyzerApp:
 
         self.credits_label = Label(self.right_frame, text="Physical Exercises Analyzer\nMade By Daniel Popescu",
                                    font=H2_FONT, background=LIGHT_BLUE)
-        self.credits_label.grid(row=10, column=0, columnspan=2, padx=10, pady=(120, 10), sticky="se")
+        self.credits_label.grid(row=10, column=0, columnspan=2, padx=10, pady=(110, 10), sticky="se")
 
     def __modify_status(self, new_status=None, new_color=None):
         if new_status is None:
@@ -167,7 +168,20 @@ class ExercisesAnalyzerApp:
         self.right_frame.pack(side=tk.RIGHT, fill="both")
 
     def __save_txt_result(self):
-        pass
+        file_types = [("Text File", "*.txt")]
+
+        file = fd.asksaveasfilename(
+            title="Save text file",
+            initialdir="./",
+            initialfile=self.filename_no_extension + "_text_result",
+            defaultextension=".txt",
+            filetypes=file_types
+        )
+
+        if file != "":
+            with open(file, "w") as f:
+                f.write(self.result_text_box.get("1.0", "end-1c"))
+            self.__modify_status("Text file saved", GREEN)
 
     def __save_video_result(self):
         pass
@@ -181,6 +195,9 @@ class ExercisesAnalyzerApp:
         if json_path != "":
             start_time = time.clock()
 
+            self.download_txt_result.configure(state=DISABLED)
+            self.download_video_result.configure(state=DISABLED)
+
             self.__modify_status("Analyzing JSON", YELLOW)
             self.json_path = json_path
             self.__get_file_name(json_path)
@@ -189,6 +206,7 @@ class ExercisesAnalyzerApp:
             analyze_model(self.evaluation_options)
 
             self.__modify_status("JSON analyzed", GREEN)
+            self.download_txt_result.configure(state=NORMAL)
 
             print(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
@@ -201,8 +219,8 @@ class ExercisesAnalyzerApp:
 
     def __load_video(self):
         file_types = (
-            ('MP4 File', '*.mp4'),
-            ('AVI File', '*.avi')
+            ("MP4 File", "*.mp4"),
+            ("AVI File", "*.avi")
         )
 
         file_path = fd.askopenfilename(
@@ -213,6 +231,9 @@ class ExercisesAnalyzerApp:
         if file_path != "":
             start_time = time.clock()
 
+            self.download_txt_result.configure(state=DISABLED)
+            self.download_video_result.configure(state=DISABLED)
+
             self.__modify_status("Analyzing video", YELLOW)
             self.__generate_json_files(file_path)
             self.__create_evaluate_options(file_path)
@@ -220,6 +241,8 @@ class ExercisesAnalyzerApp:
             analyze_model(self.evaluation_options)
 
             self.__modify_status("Video analyzed", GREEN)
+            self.download_txt_result.configure(state=NORMAL)
+            self.download_video_result.configure(state=NORMAL)
 
             print(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
