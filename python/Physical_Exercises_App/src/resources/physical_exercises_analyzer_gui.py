@@ -62,7 +62,7 @@ class ExercisesAnalyzerApp:
     def __initialize_master(self):
         self.master = tk.Tk()
         self.master.title("Physical Exercises Analyzer")
-        self.master.geometry("900x600")
+        self.master.geometry("950x600")
         self.master.resizable(False, False)
         self.master.update()
 
@@ -100,9 +100,9 @@ class ExercisesAnalyzerApp:
         self.analyzer_label = Label(self.left_frame, text="Analyzer result")
         self.analyzer_label.grid(row=4, column=0, columnspan=3, padx=(25, 0), pady=(45, 15), sticky="w")
 
-        self.result_text_box = tk.Text(self.left_frame, borderwidth=2, font=H2_FONT, width=70, height=20)
+        self.result_text_box = tk.Text(self.left_frame, borderwidth=2, font=H2_FONT, width=80, height=20)
         self.result_text_box.configure(state=DISABLED)
-        self.result_text_box.grid(row=5, column=0, columnspan=3, padx=(15, 55), pady=5, sticky="w")
+        self.result_text_box.grid(row=5, column=0, columnspan=3, padx=(15, 25), pady=5, sticky="w")
 
     def __initialize_right_frame(self):
         self.right_frame = Frame(self.master)
@@ -121,29 +121,35 @@ class ExercisesAnalyzerApp:
         self.show_graphs_checkbutton = Checkbutton(self.right_frame, text="Show graphs",
                                                    variable=self.show_graphs_checkbutton_variable, onvalue=TRUE,
                                                    offvalue=FALSE)
-        self.show_graphs_checkbutton.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="w")
+        self.show_graphs_checkbutton.grid(row=2, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+
+        self.show_stats_checkbutton_variable = tk.StringVar(self.right_frame, TRUE)
+        self.show_stats_checkbutton = Checkbutton(self.right_frame, text="Show stats for nerds",
+                                                  variable=self.show_stats_checkbutton_variable, onvalue=TRUE,
+                                                  offvalue=FALSE)
+        self.show_stats_checkbutton.grid(row=3, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="w")
 
         self.download_results_label = Label(self.right_frame, text="Download results")
-        self.download_results_label.grid(row=3, column=0, columnspan=2, padx=10, pady=(40, 10))
+        self.download_results_label.grid(row=4, column=0, columnspan=2, padx=10, pady=(40, 10))
 
         self.download_txt_result = Button(self.right_frame, text="Download .txt result", state=DISABLED,
                                           command=self.__save_txt_result, padding=3)
-        self.download_txt_result.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+        self.download_txt_result.grid(row=5, column=0, columnspan=2, padx=10, pady=10)
 
         self.download_video_result = Button(self.right_frame, text="Download video result", state=DISABLED,
                                             command=self.__save_video_result, padding=3)
-        self.download_video_result.grid(row=5, column=0, columnspan=2, padx=10, pady=10)
+        self.download_video_result.grid(row=6, column=0, columnspan=2, padx=10, pady=10)
 
         self.status_label = Label(self.right_frame, text="Status", font=H2_FONT_BOLD)
-        self.status_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(40, 10), sticky="w")
+        self.status_label.grid(row=7, column=0, columnspan=2, padx=10, pady=(40, 10), sticky="w")
 
         self.status = Label(self.right_frame, text="Waiting for input", font=H2_FONT_BOLD, foreground=BLACK,
                             background=WHITE, padding=5, relief="solid")
-        self.status.grid(row=7, column=0, columnspan=2, padx=10, sticky="w")
+        self.status.grid(row=8, column=0, columnspan=2, padx=10, sticky="w")
 
         self.credits_label = Label(self.right_frame, text="Physical Exercises Analyzer\nMade By Daniel Popescu",
                                    font=H2_FONT, background=LIGHT_BLUE)
-        self.credits_label.grid(row=10, column=0, columnspan=2, padx=10, pady=(110, 10), sticky="se")
+        self.credits_label.grid(row=10, column=0, columnspan=2, padx=10, pady=(70, 10), sticky="se")
 
     def __modify_status(self, new_status=None, new_color=None):
         if new_status is None:
@@ -212,7 +218,8 @@ class ExercisesAnalyzerApp:
             self.__modify_status("JSON analyzed", GREEN)
             self.download_txt_result.configure(state=NORMAL)
 
-            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+            if self.show_stats_checkbutton_variable.get() == TRUE:
+                self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
     def __get_file_name(self, folder_path):
         _, _, files = next(os.walk(folder_path))
@@ -251,7 +258,8 @@ class ExercisesAnalyzerApp:
             self.download_txt_result.configure(state=NORMAL)
             self.download_video_result.configure(state=NORMAL)
 
-            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+            if self.show_stats_checkbutton_variable.get() == TRUE:
+                self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
     def __populate_evaluate_options(self, file_path=""):
         self.evaluation_options.filename = self.filename_no_extension
@@ -265,6 +273,7 @@ class ExercisesAnalyzerApp:
             self.evaluation_options.exercise_type = AUTO
         else:
             self.evaluation_options.exercise_type = self.exercise_type_variable.get()
+        self.evaluation_options.show_stats = self.show_stats_checkbutton_variable.get()
 
     def __generate_json_files(self, file_path):
         filename = os.path.basename(file_path)
@@ -274,12 +283,14 @@ class ExercisesAnalyzerApp:
         os.chdir(self.python_folder_path)
 
         command = f"""python {self.openpose_python_path} --model_pose COCO --display 0 --render_pose 0 --video {file_path} --net_resolution -1x176 --face_net_resolution 320x320 --number_people_max 1 --write_json {self.json_path}"""
-        self.__update_result_text("Command executed:\n" + command)
+        if self.show_stats_checkbutton_variable.get() == TRUE:
+            self.__update_result_text("Openpose command executed:\n\n" + command)
 
         os.system(command)
         os.chdir(initial_directory)
 
-        self.__update_result_text(f"Saved JSON files to {self.json_path}")
+        if self.show_stats_checkbutton_variable.get() == TRUE:
+            self.__update_result_text(f"Saved JSON files to {self.json_path}")
 
     def __update_result_text(self, text=""):
         self.result_text_box.configure(state=NORMAL)

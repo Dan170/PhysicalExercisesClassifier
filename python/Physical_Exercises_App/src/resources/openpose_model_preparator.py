@@ -7,7 +7,7 @@ from dtw import dtw
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from resources.constants import PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, PUSHUPS_LEFT, PUSHUPS_RIGHT, \
-    AUTO, TRUE
+    AUTO, TRUE, OK, INCOMPLETE, WRONG
 from resources.evaluation_options import EvaluationOptions
 
 KEYPOINTS_JSON = '_keypoints.json'
@@ -49,32 +49,61 @@ def analyze_model(evaluation_options):
                                 evaluation_options.filename)
 
     dataframes = split_dataframe(dataframe)
-    __update_result_text(evaluation_options, f"Found {len(dataframes)} {exercise_type}")
+    repetitions_count = len(dataframes)
+    ok_count = 0
+    incomplete_count = 0
+    wrong_count = 0
+    workout_exec_time = 0
 
     for index, split_df in enumerate(dataframes):
-        __update_result_text(evaluation_options, f"||||||||||||  For {exercise_type} number {index + 1}")
+        __update_result_text(evaluation_options, f"|============================|\n{exercise_type} number {index + 1}")
 
-        if evaluation_options.show_graphs == TRUE and len(dataframes) > 1:
+        if evaluation_options.show_graphs == TRUE and repetitions_count > 1:
             plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
                                     evaluation_options.filename + str(index + 1))
-        evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
+
+        result = evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
+        if result is OK:
+            ok_count = ok_count + 1
+        elif result is INCOMPLETE:
+            incomplete_count = incomplete_count + 1
+        else:
+            wrong_count = wrong_count + 1
 
         if evaluation_options.fps != 0:
             exec_time = split_df.shape[0] / evaluation_options.fps
+            workout_exec_time = workout_exec_time + exec_time
             __update_result_text(evaluation_options, "Execution time: {:.2f} seconds".format(exec_time))
+
+    __update_result_text(evaluation_options,
+                         f"|============================|\nWorkout summary: Found {repetitions_count} {exercise_type}")
+    __update_result_text(evaluation_options, f"Ok: {ok_count}")
+    __update_result_text(evaluation_options, f"Incomplete: {incomplete_count}")
+    __update_result_text(evaluation_options, f"Wrong: {wrong_count}")
+
+    if evaluation_options.fps != 0:
+        __update_result_text(evaluation_options, "Total workout time: {:.2f} seconds".format(workout_exec_time))
+        __update_result_text(evaluation_options, "Average repetition time: {:.2f} seconds / repetition".format(
+            workout_exec_time / repetitions_count))
+
+    __update_result_text(evaluation_options, "|============================|")
 
 
 def evaluate_dataframe(dataframe, correct_dataframe, evaluation_options=EvaluationOptions()):
     evaluated_dataframe = __evaluate_dtw_columns(dataframe, correct_dataframe)
 
     median_value = round(evaluated_dataframe.median()[0])
-    __update_result_text(evaluation_options, f"Repetition threshold: {median_value}")
+    if evaluation_options.show_stats == TRUE:
+        __update_result_text(evaluation_options, f"Repetition threshold: {median_value}")
     if median_value < 25:
         __update_result_text(evaluation_options, "Exercise is ok")
+        return OK
     elif median_value < 35:
         __update_result_text(evaluation_options, "Exercise is incomplete")
+        return INCOMPLETE
     else:
         __update_result_text(evaluation_options, "Wrong exercise")
+        return WRONG
 
 
 def model_prepare(options, save_model=False):
@@ -111,7 +140,8 @@ def split_dataframe(dataframe, options=EvaluationOptions()):
     previous_value = dataframe_values[0]
     starting_index = 0
     graph_type = __get_graph_type(dataframe_values)
-    __update_result_text(options, f"Found graph type: {graph_type}")
+    if options.show_stats == TRUE:
+        __update_result_text(options, f"Found graph type: {graph_type}")
     found_extreme = False
     dataframes = []
 
@@ -192,7 +222,8 @@ def plot_dataframe(df, label):
 
 
 def load_from_pickle(file_path="", evaluation_options=EvaluationOptions()):
-    __update_result_text(evaluation_options, f"Loaded {file_path}")
+    if evaluation_options.show_stats == TRUE:
+        __update_result_text(evaluation_options, f"Loaded pickle model: {file_path}")
     return pd.read_pickle(file_path)
 
 
@@ -334,7 +365,8 @@ def __transform_model(raw_pd_pose_model):
 
 
 def __load_correct_model(path, side_detected, evaluation_options):
-    __update_result_text(evaluation_options, f"Side detected: {side_detected}")
+    if evaluation_options.show_stats == TRUE:
+        __update_result_text(evaluation_options, f"Side detected: {side_detected}")
     if side_detected is PULLUPS:
         return load_from_pickle(path + PULLUPS + ".pkl", evaluation_options), PULLUPS
     elif side_detected is LEFT:
