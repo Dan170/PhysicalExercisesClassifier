@@ -53,13 +53,14 @@ def analyze_model(evaluation_options):
     for index, split_df in enumerate(dataframes):
         print("||||||||||||  For {} number {}".format(exercise_type, index + 1))
 
-        if evaluation_options.show_graphs == TRUE:
+        if evaluation_options.show_graphs == TRUE and len(dataframes) > 1:
             plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
                                     evaluation_options.filename + str(index + 1))
         evaluate_dataframe(split_df, correct_dataframe)
 
-        exec_time = split_df.shape[0] / evaluation_options.fps
-        print("Execution time: {:.2f} seconds".format(exec_time))
+        if evaluation_options.fps != 0:
+            exec_time = split_df.shape[0] / evaluation_options.fps
+            print("Execution time: {:.2f} seconds".format(exec_time))
 
 
 def evaluate_dataframe(dataframe, correct_dataframe):
