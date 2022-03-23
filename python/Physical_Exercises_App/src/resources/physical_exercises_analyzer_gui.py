@@ -110,7 +110,7 @@ class ExercisesAnalyzerApp:
         self.open_file_button.grid(row=1, column=0, padx=15, pady=10)
 
         self.show_graphs_checkbutton_variable = tk.StringVar(self.right_frame, TRUE)
-        self.show_graphs_checkbutton = Checkbutton(self.right_frame, text="Show Graphs",
+        self.show_graphs_checkbutton = Checkbutton(self.right_frame, text="Show graphs",
                                                    variable=self.show_graphs_checkbutton_variable, onvalue=TRUE,
                                                    offvalue=FALSE)
         self.show_graphs_checkbutton.grid(row=2, column=0, columnspan=2, padx=15, pady=10, sticky="w")

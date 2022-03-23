@@ -81,9 +81,7 @@ def model_prepare(options, save_model=False):
     detection_type = options.detection_type
 
     raw_pd_pose_model = __create_pose_dataframe(folder_path, file_name)
-    modeled_pd_pose_model = __transform_model(raw_pd_pose_model)
-
-    side_detected = __find_side(modeled_pd_pose_model)
+    modeled_pd_pose_model, side_detected = __transform_model(raw_pd_pose_model)
     __interpolate_model(modeled_pd_pose_model)
 
     dataframe_for_ml = split_dataframe(modeled_pd_pose_model)[0]
@@ -322,9 +320,10 @@ def __transform_model(raw_pd_pose_model):
 
     __drop_confidence_columns(modeled_pd_pose_model)
     modeled_pd_pose_model.columns = POSE_MODEL_COLUMNS
+    side_detected = __find_side(modeled_pd_pose_model)
     __drop_zero_predominant_columns(modeled_pd_pose_model)
 
-    return modeled_pd_pose_model
+    return modeled_pd_pose_model, side_detected
 
 
 def __load_correct_model(path, side_detected):
