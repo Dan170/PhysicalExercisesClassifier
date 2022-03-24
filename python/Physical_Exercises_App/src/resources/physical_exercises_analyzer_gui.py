@@ -69,7 +69,7 @@ class ExercisesAnalyzerApp:
     def __initialize_left_frame(self):
         self.left_frame = Frame(self.master)
 
-        self.detection_button_variable = tk.StringVar(self.left_frame, MANUAL)
+        self.detection_button_variable = tk.StringVar(self.left_frame, AUTO)
         self.exercise_type_variable = tk.StringVar(self.left_frame, PUSHUPS)
 
         self.detection_type_label = Label(self.left_frame, text="Detection type")
@@ -87,11 +87,11 @@ class ExercisesAnalyzerApp:
         self.exercise_type_label.grid(row=2, column=0, columnspan=3, padx=(25, 0), pady=10, sticky="w")
 
         self.pushups_button = Radiobutton(self.left_frame, text="Pushups", variable=self.exercise_type_variable,
-                                          value=PUSHUPS)
+                                          value=PUSHUPS, state=DISABLED)
         self.pushups_button.grid(row=3, column=0, padx=(25, 0), sticky="w")
 
         self.pullups_button = Radiobutton(self.left_frame, text="Pullups", variable=self.exercise_type_variable,
-                                          value=PULLUPS)
+                                          value=PULLUPS, state=DISABLED)
         self.pullups_button.grid(row=3, column=1, sticky="w")
 
         self.coming_soon_button = Radiobutton(self.left_frame, text="More coming soon", state=DISABLED)

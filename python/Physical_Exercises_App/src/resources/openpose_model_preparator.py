@@ -126,7 +126,8 @@ def model_prepare(options, save_model=False):
     dataframe_for_ml = split_dataframe(modeled_pd_pose_model, options)[0]
 
     if detection_type == AUTO:
-        exercise_type = find_exercise_type(dataframe_for_ml)
+        exercise_type = __find_exercise_type(dataframe_for_ml, options)
+        __update_result_text(options, f"{exercise_type} exercise detected.")
     else:
         exercise_type = options.exercise_type
 
@@ -137,9 +138,35 @@ def model_prepare(options, save_model=False):
     return modeled_pd_pose_model, side_detected, exercise_type
 
 
-def find_exercise_type(dataframe_for_ml):
-    exercise_type = PUSHUPS
-    return exercise_type
+def __find_exercise_type(dataframe_for_ml, options=EvaluationOptions()):
+    path = options.python_folder_path + "/Physical_Exercises_App/src/resources/pickle_models/"
+    df = split_dataframe(dataframe_for_ml)[0]
+    pullups = load_from_pickle(path + PULLUPS + ".pkl", options)
+    pushups_left = load_from_pickle(path + PUSHUPS_LEFT + ".pkl", options)
+    pushups_right = load_from_pickle(path + PUSHUPS_RIGHT + ".pkl", options)
+
+    return __find_most_accurate_exercise(df, pullups, pushups_left, pushups_right)
+
+
+def __find_most_accurate_exercise(df, pullups, pushups_left, pushups_right):
+    evaluation_options = EvaluationOptions()
+    evaluation_options.show_stats = False
+
+    _, pullups_median = evaluate_dataframe(df, pullups, evaluation_options)
+    _, pushups_left_median = evaluate_dataframe(df, pushups_left, evaluation_options)
+    _, pushups_right_median = evaluate_dataframe(df, pushups_right, evaluation_options)
+
+    values = {
+        PULLUPS: pullups_median,
+        PUSHUPS_LEFT: pushups_left_median,
+        PUSHUPS_RIGHT: pushups_right_median
+    }
+
+    most_accurate = min(values, key=values.get)
+    if most_accurate == PULLUPS:
+        return PULLUPS
+    else:
+        return PUSHUPS
 
 
 def split_dataframe(dataframe, options=EvaluationOptions()):
@@ -291,10 +318,15 @@ def __get_graph_type(dataframe_values):
 
 
 def __evaluate_dynamic_time_warping(df1, df2, feature):
-    dtw_value = dtw(df1[feature], df2[feature])
+    distance = -1
+    try:
+        dtw_value = dtw(df1[feature], df2[feature])
+        distance = dtw_value.normalizedDistance
     # print("DTW normalized distance for {} is {}".format(feature, dtw_value.normalizedDistance))
-
-    return dtw_value.normalizedDistance
+    except ValueError:
+        distance = -1
+    finally:
+        return distance
 
 
 def __evaluate_dtw_columns(df1, df2):
