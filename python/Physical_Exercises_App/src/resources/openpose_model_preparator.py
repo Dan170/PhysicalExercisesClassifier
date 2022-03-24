@@ -39,7 +39,7 @@ POSE_MODEL_COLUMNS = ['nose_x', 'nose_y', 'right_shoulder_x', 'right_shoulder_y'
 def analyze_model(evaluation_options):
     dataframe, side_detected, exercise_type = model_prepare(evaluation_options)
 
-    if exercise_type is PULLUPS:
+    if exercise_type == PULLUPS:
         side_detected = PULLUPS
     pickle_models_path = evaluation_options.python_folder_path + "/Physical_Exercises_App/src/resources/pickle_models/"
     correct_dataframe, correct_file_name = __load_correct_model(pickle_models_path, side_detected, evaluation_options)
@@ -54,6 +54,7 @@ def analyze_model(evaluation_options):
     incomplete_count = 0
     wrong_count = 0
     workout_exec_time = 0
+    total_median = 0
 
     for index, split_df in enumerate(dataframes):
         __update_result_text(evaluation_options, f"|============================|\n{exercise_type} number {index + 1}")
@@ -62,7 +63,9 @@ def analyze_model(evaluation_options):
             plot_compare_dataframes(correct_dataframe, split_df, correct_file_name + "_CORRECT",
                                     evaluation_options.filename + str(index + 1))
 
-        result = evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
+        result, median_value = evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
+        total_median = total_median + median_value
+
         if result is OK:
             ok_count = ok_count + 1
         elif result is INCOMPLETE:
@@ -86,6 +89,11 @@ def analyze_model(evaluation_options):
         __update_result_text(evaluation_options, "Average repetition time: {:.2f} seconds / repetition".format(
             workout_exec_time / repetitions_count))
 
+    average_median = total_median / repetitions_count
+    if evaluation_options.show_stats == TRUE:
+        __update_result_text(evaluation_options, "Average threshold: {:.2f} / repetition".format(average_median))
+    __check_average_median(average_median, evaluation_options)
+
     __update_result_text(evaluation_options, "|============================|")
 
 
@@ -97,13 +105,13 @@ def evaluate_dataframe(dataframe, correct_dataframe, evaluation_options=Evaluati
         __update_result_text(evaluation_options, f"Repetition threshold: {median_value}")
     if median_value < 25:
         __update_result_text(evaluation_options, "Exercise is ok")
-        return OK
+        return OK, median_value
     elif median_value < 35:
         __update_result_text(evaluation_options, "Exercise is incomplete")
-        return INCOMPLETE
+        return INCOMPLETE, median_value
     else:
         __update_result_text(evaluation_options, "Wrong exercise")
-        return WRONG
+        return WRONG, median_value
 
 
 def model_prepare(options, save_model=False):
@@ -117,7 +125,7 @@ def model_prepare(options, save_model=False):
 
     dataframe_for_ml = split_dataframe(modeled_pd_pose_model, options)[0]
 
-    if detection_type is AUTO:
+    if detection_type == AUTO:
         exercise_type = find_exercise_type(dataframe_for_ml)
     else:
         exercise_type = options.exercise_type
@@ -146,7 +154,7 @@ def split_dataframe(dataframe, options=EvaluationOptions()):
     dataframes = []
 
     for index, current_value in enumerate(dataframe_values):
-        if graph_type is ASCENDING:
+        if graph_type == ASCENDING:
             # first if clause is checking if the values are still increasing. After that, we suppose that the values
             # started decreasing
             if found_extreme is False and (
@@ -161,7 +169,31 @@ def split_dataframe(dataframe, options=EvaluationOptions()):
                      or __check_abs(current_value, dataframe_values[index + 1])):
                 found_extreme = True
                 previous_value = current_value
-            elif index + 1 is dataframe_length:
+            elif index + 1 == dataframe_length:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                break
+            else:
+                split_df = dataframe.iloc[starting_index:index + 1, :]
+                dataframes.append(split_df)
+                starting_index = index
+                found_extreme = False
+                previous_value = current_value
+
+        else:
+            if found_extreme is False and (
+                    current_value <= previous_value or (dataframe_length > index + 1 and (
+                    current_value >= dataframe_values[index + 1]
+                    or __check_abs(current_value, dataframe_values[index + 1])))):
+                previous_value = current_value
+                continue
+
+            if dataframe_length > index + 1 and \
+                    (current_value < dataframe_values[index + 1]
+                     or __check_abs(current_value, dataframe_values[index + 1])):
+                found_extreme = True
+                previous_value = current_value
+            elif index + 1 == dataframe_length:
                 split_df = dataframe.iloc[starting_index:index + 1, :]
                 dataframes.append(split_df)
                 break
@@ -225,6 +257,17 @@ def load_from_pickle(file_path="", evaluation_options=EvaluationOptions()):
     if evaluation_options.show_stats == TRUE:
         __update_result_text(evaluation_options, f"Loaded pickle model: {file_path}")
     return pd.read_pickle(file_path)
+
+
+def __check_average_median(average_median, evaluation_options):
+    if average_median < 10:
+        median_summary = "Overall excellent workout"
+    elif average_median < 15:
+        median_summary = "Overall good workout"
+    else:
+        median_summary = "Overall ok workout"
+
+    __update_result_text(evaluation_options, median_summary)
 
 
 def __update_result_text(evaluation_options, text):
@@ -367,9 +410,9 @@ def __transform_model(raw_pd_pose_model):
 def __load_correct_model(path, side_detected, evaluation_options):
     if evaluation_options.show_stats == TRUE:
         __update_result_text(evaluation_options, f"Side detected: {side_detected}")
-    if side_detected is PULLUPS:
+    if side_detected == PULLUPS:
         return load_from_pickle(path + PULLUPS + ".pkl", evaluation_options), PULLUPS
-    elif side_detected is LEFT:
+    elif side_detected == LEFT:
         return load_from_pickle(path + PUSHUPS_LEFT + ".pkl", evaluation_options), PUSHUPS_LEFT
-    elif side_detected is RIGHT:
+    elif side_detected == RIGHT:
         return load_from_pickle(path + PUSHUPS_RIGHT + ".pkl", evaluation_options), PUSHUPS_RIGHT
