@@ -358,8 +358,14 @@ def __create_pose_dataframe(folder_path, file_name):
             elif i <= 999:
                 file_path = folder_path + '\\' + file_name + '_000000000' + str(i) + KEYPOINTS_JSON
                 json_data = __read_json_file(file_path)
-            else:
+            elif i <= 9999:
                 file_path = folder_path + '\\' + file_name + '_00000000' + str(i) + KEYPOINTS_JSON
+                json_data = __read_json_file(file_path)
+            elif i <= 99999:
+                file_path = folder_path + '\\' + file_name + '_0000000' + str(i) + KEYPOINTS_JSON
+                json_data = __read_json_file(file_path)
+            else:
+                file_path = folder_path + '\\' + file_name + '_000000' + str(i) + KEYPOINTS_JSON
                 json_data = __read_json_file(file_path)
 
             dataframe = dataframe.append(json_data, ignore_index=True)
