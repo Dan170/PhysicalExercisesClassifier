@@ -1,8 +1,8 @@
-from resources.constants import TRUE, MANUAL, PUSHUPS
+from resources.constants import TRUE, FALSE, MANUAL, PUSHUPS
 
 
 class EvaluationOptions:
-    def __init__(self, filename="", folder_path="", python_folder_path="", fps=0, show_graphs=TRUE,
+    def __init__(self, filename="", folder_path="", python_folder_path="", fps=0, show_graphs=FALSE,
                  detection_type=MANUAL, exercise_type=PUSHUPS, result_text="", show_stats=TRUE):
         self.filename = filename
         self.folder_path = folder_path
