@@ -270,7 +270,7 @@ class ExercisesAnalyzerApp:
         width = video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)
         height = video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-        output = cv2.VideoWriter(filename, fourcc, 20.0, (int(width) + 275, int(height)))
+        output = cv2.VideoWriter(filename, fourcc, self.evaluation_options.fps, (int(width) + 275, int(height)))
 
         frames_in_video = int(video_stream.get(cv2.CAP_PROP_FRAME_COUNT))
         frames_difference = frames_in_video - sum(times_list)
