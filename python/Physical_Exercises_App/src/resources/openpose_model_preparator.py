@@ -55,6 +55,8 @@ def analyze_model(evaluation_options):
     wrong_count = 0
     workout_exec_time = 0
     total_median = 0
+    times_list = []
+    ex_eval_list = []
 
     for index, split_df in enumerate(dataframes):
         __update_result_text(evaluation_options, f"|============================|\n{exercise_type} number {index + 1}")
@@ -65,6 +67,7 @@ def analyze_model(evaluation_options):
 
         result, median_value = evaluate_dataframe(split_df, correct_dataframe, evaluation_options)
         total_median = total_median + median_value
+        ex_eval_list.append(result)
 
         if result is OK:
             ok_count = ok_count + 1
@@ -75,8 +78,13 @@ def analyze_model(evaluation_options):
 
         if evaluation_options.fps != 0:
             exec_time = split_df.shape[0] / evaluation_options.fps
+            times_list.append(split_df.shape[0])
             workout_exec_time = workout_exec_time + exec_time
             __update_result_text(evaluation_options, "Execution time: {:.2f} seconds".format(exec_time))
+
+    if len(times_list) > 0:
+        results = [ex_eval_list, times_list]
+        evaluation_options.results = results
 
     __update_result_text(evaluation_options,
                          f"|============================|\nWorkout summary: Found {repetitions_count} {exercise_type}")
@@ -95,6 +103,7 @@ def analyze_model(evaluation_options):
     __check_average_median(average_median, evaluation_options)
 
     __update_result_text(evaluation_options, "|============================|")
+    evaluation_options.exercise_type = exercise_type
 
 
 def evaluate_dataframe(dataframe, correct_dataframe, evaluation_options=EvaluationOptions()):

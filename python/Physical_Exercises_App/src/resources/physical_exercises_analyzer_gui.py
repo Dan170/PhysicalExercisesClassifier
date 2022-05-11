@@ -1,11 +1,14 @@
+import os
+import sys
+import time
 import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter.ttk import Style, Frame, Label, Radiobutton, Button, Checkbutton
-from resources.constants import PUSHUPS, PULLUPS, MANUAL, AUTO, TRUE, FALSE
-from resources.evaluation_options import EvaluationOptions
-import os
-import time
 
+import cv2
+
+from resources.constants import PUSHUPS, PULLUPS, MANUAL, AUTO, TRUE, FALSE, OK, INCOMPLETE, WRONG
+from resources.evaluation_options import EvaluationOptions
 from resources.openpose_model_preparator import analyze_model
 
 DISABLED = tk.DISABLED
@@ -21,6 +24,50 @@ RED = "#fc3d3d"
 WHITE = "#ffffff"
 BLACK = "#000000"
 LIGHT_BLUE = "#c0f4fc"
+
+WHITE_RGB = [255, 255, 255]
+BLACK_RGB = [0, 0, 0]
+
+
+def show_frame(title, frame):
+    cv2.imshow(title, frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        cv2.destroyAllWindows()
+        sys.exit(0)
+
+
+def get_video_fps(file_path):
+    video = cv2.VideoCapture(file_path)
+    return video.get(cv2.CAP_PROP_FPS)
+
+
+def process_frame(frame, evaluation_options, ex_eval, ok_count, incomplete_count, wrong_count, total_count):
+    procent = 100
+    width_orig = int(frame.shape[1] * procent / 100)
+    width = int(frame.shape[1] * procent / 100 + 275)
+    height = int(frame.shape[0] * procent / 100)
+    dim = (width, height)
+    dim_orig = (width_orig, height)
+    frame_resized = cv2.resize(frame, dim)
+    frame = cv2.resize(frame, dim_orig)
+    distance = int(height / 7)
+
+    cv2.copyMakeBorder(frame, 0, 0, 0, 275, cv2.BORDER_CONSTANT, frame_resized, WHITE_RGB)
+
+    cv2.putText(frame_resized, evaluation_options.exercise_type, (width_orig + 15, distance), cv2.FONT_HERSHEY_SIMPLEX,
+                0.9, BLACK_RGB, 2)
+    cv2.putText(frame_resized, ex_eval, (width_orig + 15, distance * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.9, BLACK_RGB, 2)
+    cv2.putText(frame_resized, "OK: " + str(ok_count), (width_orig + 15, distance * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                BLACK_RGB, 2)
+    cv2.putText(frame_resized, "INCOMPLETE: " + str(incomplete_count), (width_orig + 15, distance * 4),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, BLACK_RGB, 2)
+    cv2.putText(frame_resized, "WRONG: " + str(wrong_count), (width_orig + 15, distance * 5), cv2.FONT_HERSHEY_SIMPLEX,
+                0.9, BLACK_RGB, 2)
+    cv2.putText(frame_resized, "TOTAL: " + str(total_count), (width_orig + 15, distance * 6), cv2.FONT_HERSHEY_SIMPLEX,
+                0.9, BLACK_RGB, 2)
+    # show_frame(evaluation_options.filename, frame_resized)
+    return frame_resized
 
 
 class ExercisesAnalyzerApp:
@@ -184,14 +231,74 @@ class ExercisesAnalyzerApp:
             defaultextension=".txt",
             filetypes=file_types
         )
+        if file == "":
+            return
 
-        if file != "":
-            with open(file, "w") as f:
-                f.write(self.result_text_box.get("1.0", "end-1c"))
-            self.__modify_status("Text file saved", GREEN)
+        with open(file, "w") as f:
+            f.write(self.result_text_box.get("1.0", "end-1c"))
+        self.__modify_status("Text file saved", GREEN)
 
     def __save_video_result(self):
-        pass
+        file_types = [("AVI", "*.avi")]
+
+        file = fd.asksaveasfilename(
+            title="Save video file",
+            initialdir="./",
+            initialfile=self.filename_no_extension + "_video_result",
+            defaultextension=".avi",
+            filetypes=file_types
+        )
+        if file == "":
+            return
+
+        self.__modify_status("Processing video file", YELLOW)
+        self.process_and_save_video(file)
+
+        self.__modify_status("Video file saved", GREEN)
+
+    def process_and_save_video(self, filename):
+        results = self.evaluation_options.results
+        ex_eval_list = results[0]
+        times_list = results[1]
+        total_count = 0
+        ok_count = 0
+        incomplete_count = 0
+        wrong_count = 0
+        video_stream = cv2.VideoCapture(self.evaluation_options.video_path)
+        assert video_stream.isOpened()
+
+        width = video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)  # float `width`
+        height = video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+        output = cv2.VideoWriter(filename, fourcc, 20.0, (int(width) + 275, int(height)))
+
+        frames_in_video = int(video_stream.get(cv2.CAP_PROP_FRAME_COUNT))
+        frames_difference = frames_in_video - sum(times_list)
+        times_list[-1] = times_list[-1] + frames_difference - 1
+
+        for i in range(len(times_list)):
+            for _ in range(times_list[i]):
+                _, frame = video_stream.read()
+                if frame is None:
+                    break
+                processed_frame = process_frame(frame, self.evaluation_options, ex_eval_list[i], ok_count,
+                                                incomplete_count, wrong_count, total_count)
+                output.write(processed_frame)
+
+            if ex_eval_list[i] == OK:
+                ok_count = ok_count + 1
+            elif ex_eval_list[i] == INCOMPLETE:
+                incomplete_count = incomplete_count + 1
+            elif ex_eval_list[i] == WRONG:
+                wrong_count = wrong_count + 1
+            total_count = total_count + 1
+
+        _, frame = video_stream.read()
+        if frame is None:
+            return
+        processed_frame = process_frame(frame, self.evaluation_options, ex_eval_list[-1], ok_count, incomplete_count,
+                                        wrong_count, total_count)
+        output.write(processed_frame)
 
     def __load_json_folder(self):
         json_path = fd.askdirectory(
@@ -199,27 +306,29 @@ class ExercisesAnalyzerApp:
             initialdir="./"
         )
 
-        if json_path != "":
-            start_time = time.clock()
+        if json_path == "":
+            return
 
-            self.__clear_result_text()
-            self.__update_result_text("Folder loaded: " + json_path)
-            self.download_txt_result.configure(state=DISABLED)
-            self.download_video_result.configure(state=DISABLED)
+        start_time = time.clock()
 
-            self.__modify_status("Analyzing JSON", YELLOW)
-            self.json_path = json_path
-            self.__get_file_name(json_path)
-            self.__populate_evaluate_options()
+        self.__clear_result_text()
+        self.__update_result_text("Folder loaded: " + json_path)
+        self.download_txt_result.configure(state=DISABLED)
+        self.download_video_result.configure(state=DISABLED)
 
-            analyze_model(self.evaluation_options)
-            self.__update_result_text(self.evaluation_options.result_text)
+        self.__modify_status("Analyzing JSON", YELLOW)
+        self.json_path = json_path
+        self.__get_file_name(json_path)
+        self.__populate_evaluate_options()
 
-            self.__modify_status("JSON analyzed", GREEN)
-            self.download_txt_result.configure(state=NORMAL)
+        analyze_model(self.evaluation_options)
+        self.__update_result_text(self.evaluation_options.result_text)
 
-            if self.show_stats_checkbutton_variable.get() == TRUE:
-                self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+        self.__modify_status("JSON analyzed", GREEN)
+        self.download_txt_result.configure(state=NORMAL)
+
+        if self.show_stats_checkbutton_variable.get() == TRUE:
+            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
     def __get_file_name(self, folder_path):
         _, _, files = next(os.walk(folder_path))
@@ -239,34 +348,37 @@ class ExercisesAnalyzerApp:
             initialdir="./",
             filetypes=file_types)
 
-        if file_path != "":
-            start_time = time.clock()
+        if file_path == "":
+            return
 
-            self.__clear_result_text()
-            self.__update_result_text("File loaded: " + file_path)
-            self.download_txt_result.configure(state=DISABLED)
-            self.download_video_result.configure(state=DISABLED)
+        start_time = time.clock()
 
-            self.__modify_status("Analyzing video", YELLOW)
-            self.__generate_json_files(file_path)
-            self.__populate_evaluate_options(file_path)
+        self.__clear_result_text()
+        self.__update_result_text("File loaded: " + file_path)
+        self.download_txt_result.configure(state=DISABLED)
+        self.download_video_result.configure(state=DISABLED)
 
-            analyze_model(self.evaluation_options)
-            self.__update_result_text(self.evaluation_options.result_text)
+        self.__modify_status("Analyzing video", YELLOW)
+        self.__generate_json_files(file_path)
+        self.__populate_evaluate_options(file_path)
 
-            self.__modify_status("Video analyzed", GREEN)
-            self.download_txt_result.configure(state=NORMAL)
-            self.download_video_result.configure(state=NORMAL)
+        analyze_model(self.evaluation_options)
+        self.__update_result_text(self.evaluation_options.result_text)
 
-            if self.show_stats_checkbutton_variable.get() == TRUE:
-                self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
+        self.__modify_status("Video analyzed", GREEN)
+        self.download_txt_result.configure(state=NORMAL)
+        self.download_video_result.configure(state=NORMAL)
+
+        if self.show_stats_checkbutton_variable.get() == TRUE:
+            self.__update_result_text(f"Program execution time: {round(time.clock() - start_time, 2)} sec")
 
     def __populate_evaluate_options(self, file_path=""):
         self.evaluation_options.filename = self.filename_no_extension
+        self.evaluation_options.video_path = file_path
         self.evaluation_options.folder_path = self.json_path
         self.evaluation_options.python_folder_path = self.python_folder_path
         if file_path != "":
-            self.evaluation_options.fps = self.__get_video_fps(file_path)
+            self.evaluation_options.fps = get_video_fps(file_path)
         self.evaluation_options.show_graphs = self.show_graphs_checkbutton_variable.get()
         self.evaluation_options.detection_type = self.detection_button_variable.get()
         if self.evaluation_options.detection_type == AUTO:
@@ -274,6 +386,7 @@ class ExercisesAnalyzerApp:
         else:
             self.evaluation_options.exercise_type = self.exercise_type_variable.get()
         self.evaluation_options.show_stats = self.show_stats_checkbutton_variable.get()
+        self.evaluation_options.results = []
 
     def __generate_json_files(self, file_path):
         filename = os.path.basename(file_path)
@@ -307,9 +420,3 @@ class ExercisesAnalyzerApp:
         self.result_text_box.configure(state=DISABLED)
 
         self.evaluation_options.result_text = ""
-
-    def __get_video_fps(self, file_path):
-        import cv2
-        video = cv2.VideoCapture(file_path)
-
-        return video.get(cv2.CAP_PROP_FPS)
