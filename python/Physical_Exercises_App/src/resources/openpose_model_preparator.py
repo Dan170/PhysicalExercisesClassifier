@@ -1,11 +1,12 @@
 import json
-
-import pandas as pd
 import os
+
 import numpy as np
-from dtw import dtw
+import pandas as pd
 import plotly.graph_objects as go
+from dtw import dtw
 from plotly.subplots import make_subplots
+
 from resources.constants import PUSHUPS, ASCENDING, DESCENDING, LEFT, RIGHT, PULLUPS, PUSHUPS_LEFT, PUSHUPS_RIGHT, \
     AUTO, TRUE, OK, INCOMPLETE, WRONG
 from resources.evaluation_options import EvaluationOptions
